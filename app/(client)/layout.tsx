@@ -20,19 +20,7 @@ export default function ClientLayout({
                 src="/logo.png"
                 alt="CCB Matériaux"
                 className="h-10 w-auto object-contain"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                  if (fallback) fallback.style.display = "flex";
-                }}
               />
-              <span
-                className="hidden items-center gap-2"
-                style={{ display: "none" }}
-              >
-                <span className="text-xl font-display font-bold" style={{ color: "var(--ccb-green)" }}>CCB</span>
-                <span className="text-sm font-medium text-gray-500">Matériaux</span>
-              </span>
             </a>
 
             <nav className="flex items-center gap-5 text-sm">
