@@ -5,15 +5,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
 
 :root {
-  --ccb-green: #1B3B2F;
-  --ccb-gold: #9C7A3C;
-  --ccb-green-light: #2E6650;
-  --ccb-gold-light: #B28B3C;
+  --ccb-green:       #1D5BB0;
+  --ccb-gold:        #F47551;
+  --ccb-green-light: #15428A;
+  --ccb-gold-light:  #E05A37;
+  --ccb-text:        #2D2D2D;
 }
 
 @layer base {
   body {
-    @apply bg-white text-gray-900 antialiased;
+    @apply bg-white antialiased;
+    color: var(--ccb-text);
     font-family: 'Inter', system-ui, sans-serif;
   }
 

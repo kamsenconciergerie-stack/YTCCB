@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   description:
     "Commandez vos matériaux de construction en ligne ou sur WhatsApp. Livraison rapide à Dakar et dans les régions.",
   keywords: ["matériaux construction", "Sénégal", "Dakar", "ciment", "carrelage", "plomberie"],
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

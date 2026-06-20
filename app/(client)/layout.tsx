@@ -11,23 +11,41 @@ export default function ClientLayout({
   return (
     <CartProvider>
       <div className="min-h-screen flex flex-col">
-        <header
-          className="sticky top-0 z-50 border-b border-white/10"
-          style={{ backgroundColor: "var(--ccb-green)" }}
-        >
+        {/* Header blanc avec logo */}
+        <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <a href="/" className="flex items-center gap-3">
-              <span className="text-2xl font-display font-bold" style={{ color: "var(--ccb-gold)" }}>
-                CCB
+            <a href="/" className="flex items-center gap-2 shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo.png"
+                alt="CCB Matériaux"
+                className="h-10 w-auto object-contain"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.style.display = "flex";
+                }}
+              />
+              <span
+                className="hidden items-center gap-2"
+                style={{ display: "none" }}
+              >
+                <span className="text-xl font-display font-bold" style={{ color: "var(--ccb-green)" }}>CCB</span>
+                <span className="text-sm font-medium text-gray-500">Matériaux</span>
               </span>
-              <span className="text-white font-medium hidden sm:block">Matériaux</span>
             </a>
 
-            <nav className="flex items-center gap-5 text-sm text-white/80">
-              <a href="/catalogue" className="hover:text-white transition-colors hidden md:block">
+            <nav className="flex items-center gap-5 text-sm">
+              <a
+                href="/catalogue"
+                className="text-gray-600 hover:text-[#1D5BB0] font-medium transition-colors hidden md:block"
+              >
                 Catalogue
               </a>
-              <a href="/suivi" className="hover:text-white transition-colors hidden md:block">
+              <a
+                href="/suivi"
+                className="text-gray-600 hover:text-[#1D5BB0] font-medium transition-colors hidden md:block"
+              >
                 Suivi commande
               </a>
               <CartCount />

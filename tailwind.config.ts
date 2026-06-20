@@ -9,33 +9,33 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Identité visuelle CCB
+        // Identité visuelle CCB — bleu #1D5BB0 / orange corail #F47551
         ccb: {
           green: {
-            DEFAULT: "#1B3B2F",
-            50:  "#E8F0ED",
-            100: "#C6D9CF",
-            200: "#9EBFB0",
-            300: "#76A591",
-            400: "#4E8B72",
-            500: "#2E6650",
-            600: "#1B3B2F", // primary
-            700: "#142D23",
-            800: "#0D1F18",
-            900: "#07110D",
+            DEFAULT: "#1D5BB0",
+            50:  "#EFF4FB",
+            100: "#D5E4F5",
+            200: "#ABCAEB",
+            300: "#81AFE0",
+            400: "#5795D6",
+            500: "#2D7ACC",
+            600: "#1D5BB0",
+            700: "#15428A",
+            800: "#0D2A5E",
+            900: "#061532",
           },
           gold: {
-            DEFAULT: "#9C7A3C",
-            50:  "#F5EFE3",
-            100: "#E8D9BC",
-            200: "#D6BE8C",
-            300: "#C4A35C",
-            400: "#B28B3C",
-            500: "#9C7A3C", // secondary
-            600: "#7E6230",
-            700: "#5F4A24",
-            800: "#413218",
-            900: "#231A0C",
+            DEFAULT: "#F47551",
+            50:  "#FEF2EE",
+            100: "#FDDDD5",
+            200: "#FBBCAC",
+            300: "#F89A82",
+            400: "#F67968",
+            500: "#F47551",
+            600: "#E05A37",
+            700: "#B84428",
+            800: "#902F1A",
+            900: "#68200C",
           },
         },
       },

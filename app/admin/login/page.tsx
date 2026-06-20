@@ -92,14 +92,12 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div
-            className="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-4"
-            style={{ backgroundColor: "var(--ccb-green)" }}
-          >
-            <span className="text-2xl font-display font-bold" style={{ color: "var(--ccb-gold)" }}>
-              CCB
-            </span>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.png"
+            alt="CCB Matériaux"
+            className="h-16 w-auto mx-auto mb-4 object-contain"
+          />
           <h1 className="text-xl font-display font-semibold text-gray-900">
             Espace administration
           </h1>
