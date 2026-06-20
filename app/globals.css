@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
+
+:root {
+  --ccb-green: #1B3B2F;
+  --ccb-gold: #9C7A3C;
+  --ccb-green-light: #2E6650;
+  --ccb-gold-light: #B28B3C;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-gray-900 antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200;
+    background-color: var(--ccb-green);
+  }
+  .btn-primary:hover {
+    background-color: var(--ccb-green-light);
+    @apply shadow-lg -translate-y-0.5;
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200;
+    background-color: var(--ccb-gold);
+  }
+  .btn-gold:hover {
+    background-color: var(--ccb-gold-light);
+    @apply shadow-lg -translate-y-0.5;
+  }
+
+  .card {
+    @apply bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200;
+  }
+
+  .badge-status-pre-confirmed  { @apply bg-yellow-100 text-yellow-800; }
+  .badge-status-confirmed       { @apply bg-blue-100 text-blue-800; }
+  .badge-status-in-preparation { @apply bg-purple-100 text-purple-800; }
+  .badge-status-in-delivery    { @apply bg-orange-100 text-orange-800; }
+  .badge-status-delivered      { @apply bg-green-100 text-green-800; }
+  .badge-status-cancelled      { @apply bg-red-100 text-red-800; }
+}
