@@ -1,0 +1,318 @@
+{
+  "name": "CCB - Sync Catalogue Produits",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 2 * * *" }]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Cron quotidien (2h du matin)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-1400, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sync-catalogue-manuel",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-manual-trigger",
+      "name": "Webhook declenchement manuel",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1400, 500],
+      "webhookId": "ccb-sync-catalogue-manuel"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'sync_started' }) }}",
+        "options": { "responseCode": 202 }
+      },
+      "id": "respond-manual-trigger",
+      "name": "Repondre 202 (sync demarree)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-1180, 500]
+    },
+    {
+      "parameters": {
+        "url": "https://www.ccbmateriaux.com/sitemap.xml",
+        "options": {
+          "ignoreResponseCode": true,
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-sitemap",
+      "name": "Recuperer sitemap produits",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-1180, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// IMPORTANT : ccbmateriaux.com bloque le crawl automatise via robots.txt.\n// Ce workflow est une solution de SECOURS uniquement, a utiliser en attendant\n// un acces direct (export CSV / admin) au site source, comme recommande dans le plan.\n// Respecter un rythme de requetes faible (delai entre pages) et un User-Agent identifie.\n\nconst response = $input.first().json;\nconst statusCode = response.statusCode || (response.body ? 200 : 0);\n\nif (statusCode !== 200 || !response.body) {\n  return [{\n    json: {\n      error: true,\n      message: 'Impossible de recuperer le sitemap. Statut: ' + statusCode + '. Verifier si le site bloque la requete ou a change de structure.',\n      productUrls: []\n    }\n  }];\n}\n\n// Extraction basique des URLs produits depuis le sitemap XML (regex simple, a adapter\n// selon la structure reelle du sitemap une fois confirmee)\nconst xml = response.body;\nconst urlMatches = [...xml.matchAll(/<loc>(.*?)<\\/loc>/g)].map(m => m[1]);\nconst productUrls = urlMatches.filter(u => u.includes('/produit/') || u.includes('/product/'));\n\nreturn [{\n  json: {\n    error: false,\n    totalFound: productUrls.length,\n    productUrls: productUrls.slice(0, 200)\n  }\n}];"
+      },
+      "id": "parse-sitemap",
+      "name": "Extraire URLs produits",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-960, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.error }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-sitemap-error",
+      "name": "IF erreur sitemap",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-740, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "productUrls",
+        "options": {}
+      },
+      "id": "split-product-urls",
+      "name": "Split URLs produits",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [-520, 380]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": { "reset": false }
+      },
+      "id": "loop-batches",
+      "name": "Boucle (1 produit a la fois)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-300, 380]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "wait-rate-limit",
+      "name": "Attente (rate limiting respectueux)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-80, 480]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.productUrls }}",
+        "options": {
+          "ignoreResponseCode": true,
+          "timeout": 15000,
+          "headers": {
+            "parameters": [
+              { "name": "User-Agent", "value": "CCB-CatalogSync-Bot/1.0 (+contact: awa.diop@yaqin-tech.com)" }
+            ]
+          }
+        }
+      },
+      "id": "fetch-product-page",
+      "name": "Recuperer page produit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-80, 280]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extraction des donnees produit depuis le HTML.\n// ATTENTION : les selecteurs ci-dessous sont des hypotheses raisonnables.\n// A AJUSTER une fois la structure HTML reelle de ccbmateriaux.com confirmee.\n\nconst response = $input.first().json;\nconst statusCode = response.statusCode || 0;\n\nif (statusCode !== 200 || !response.body) {\n  return [{\n    json: {\n      error: true,\n      sourceUrl: $json.productUrls || '',\n      message: 'Page produit inaccessible (statut ' + statusCode + ')'\n    }\n  }];\n}\n\nconst html = response.body;\n\nfunction extract(regex) {\n  const m = html.match(regex);\n  return m ? m[1].trim() : null;\n}\n\nconst name = extract(/<h1[^>]*>(.*?)<\\/h1>/is)?.replace(/<[^>]+>/g, '');\nconst priceRaw = extract(/(?:prix|price)[^>]*>([\\d\\s.,]+)\\s*(?:FCFA|CFA)?/i);\nconst price = priceRaw ? parseInt(priceRaw.replace(/[\\s.,]/g, ''), 10) : null;\nconst imageUrl = extract(/<img[^>]+(?:class=\"[^\"]*product[^\"]*\"|id=\"main-image\")[^>]+src=\"([^\"]+)\"/i);\nconst description = extract(/<div[^>]*class=\"[^\"]*description[^\"]*\"[^>]*>(.*?)<\\/div>/is)?.replace(/<[^>]+>/g, '').trim();\n\nif (!name || !price) {\n  return [{\n    json: {\n      error: true,\n      sourceUrl: $json.productUrls || '',\n      message: 'Champs essentiels (nom/prix) introuvables. Selecteurs a ajuster.'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    error: false,\n    externalRef: $json.productUrls || '',\n    name,\n    price,\n    imageUrl,\n    description: description || null,\n    lastSyncedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "parse-product-page",
+      "name": "Parser donnees produit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [140, 280]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.error }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-product-error",
+      "name": "IF erreur extraction produit",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [360, 280]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/api/products/upsert",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ externalRef: $json.externalRef, name: $json.name, price: $json.price, imageUrl: $json.imageUrl, description: $json.description, lastSyncedAt: $json.lastSyncedAt, source: 'scraping_ccbmateriaux' }) }}",
+        "options": {}
+      },
+      "id": "upsert-product",
+      "name": "Upsert produit (idempotent)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [580, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ccb-api-key-credential",
+          "name": "CCB API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log structure pour suivi des erreurs d'extraction (accumule dans staticData pour le rapport final)\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.syncErrors) staticData.syncErrors = [];\nstaticData.syncErrors.push({\n  url: $json.sourceUrl,\n  message: $json.message,\n  timestamp: new Date().toISOString()\n});\nreturn [{ json: $json }];"
+      },
+      "id": "log-product-error",
+      "name": "Logger erreur produit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [580, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fin de boucle: compile le rapport final de synchronisation\nconst staticData = $getWorkflowStaticData('global');\nconst errors = staticData.syncErrors || [];\nstaticData.syncErrors = [];\n\nreturn [{\n  json: {\n    syncCompletedAt: new Date().toISOString(),\n    errorsCount: errors.length,\n    errors: errors.slice(0, 50)\n  }\n}];"
+      },
+      "id": "compile-report",
+      "name": "Compiler rapport de sync",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-300, 700]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.errorsCount }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-has-errors",
+      "name": "IF des erreurs existent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-80, 700]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v19.0/' + $env.WHATSAPP_PHONE_NUMBER_ID + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $env.ADMIN_WHATSAPP_NUMBER, type: 'text', text: { body: 'Sync catalogue terminee avec ' + $json.errorsCount + ' erreur(s). Verifier les logs n8n (selecteurs HTML possiblement obsoletes).' } }) }}",
+        "options": {}
+      },
+      "id": "alert-admin-sync-errors",
+      "name": "Alerter admin si erreurs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [140, 700],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "whatsapp-token-credential",
+          "name": "WhatsApp Cloud API Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v19.0/' + $env.WHATSAPP_PHONE_NUMBER_ID + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $env.ADMIN_WHATSAPP_NUMBER, type: 'text', text: { body: 'ERREUR : Sync catalogue impossible. ' + $json.message } }) }}",
+        "options": {}
+      },
+      "id": "alert-admin-sitemap-failed",
+      "name": "Alerter admin (sitemap inaccessible)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-520, 180],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "whatsapp-token-credential",
+          "name": "WhatsApp Cloud API Token"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron quotidien (2h du matin)": {
+      "main": [[{ "node": "Recuperer sitemap produits", "type": "main", "index": 0 }]]
+    },
+    "Webhook declenchement manuel": {
+      "main": [[{ "node": "Repondre 202 (sync demarree)", "type": "main", "index": 0 }, { "node": "Recuperer sitemap produits", "type": "main", "index": 0 }]]
+    },
+    "Recuperer sitemap produits": {
+      "main": [[{ "node": "Extraire URLs produits", "type": "main", "index": 0 }]]
+    },
+    "Extraire URLs produits": {
+      "main": [[{ "node": "IF erreur sitemap", "type": "main", "index": 0 }]]
+    },
+    "IF erreur sitemap": {
+      "main": [[{ "node": "Alerter admin (sitemap inaccessible)", "type": "main", "index": 0 }], [{ "node": "Split URLs produits", "type": "main", "index": 0 }]]
+    },
+    "Split URLs produits": {
+      "main": [[{ "node": "Boucle (1 produit a la fois)", "type": "main", "index": 0 }]]
+    },
+    "Boucle (1 produit a la fois)": {
+      "main": [[{ "node": "Compiler rapport de sync", "type": "main", "index": 0 }], [{ "node": "Attente (rate limiting respectueux)", "type": "main", "index": 0 }]]
+    },
+    "Attente (rate limiting respectueux)": {
+      "main": [[{ "node": "Recuperer page produit", "type": "main", "index": 0 }]]
+    },
+    "Recuperer page produit": {
+      "main": [[{ "node": "Parser donnees produit", "type": "main", "index": 0 }]]
+    },
+    "Parser donnees produit": {
+      "main": [[{ "node": "IF erreur extraction produit", "type": "main", "index": 0 }]]
+    },
+    "IF erreur extraction produit": {
+      "main": [[{ "node": "Logger erreur produit", "type": "main", "index": 0 }], [{ "node": "Upsert produit (idempotent)", "type": "main", "index": 0 }]]
+    },
+    "Upsert produit (idempotent)": {
+      "main": [[{ "node": "Boucle (1 produit a la fois)", "type": "main", "index": 0 }]]
+    },
+    "Logger erreur produit": {
+      "main": [[{ "node": "Boucle (1 produit a la fois)", "type": "main", "index": 0 }]]
+    },
+    "Compiler rapport de sync": {
+      "main": [[{ "node": "IF des erreurs existent", "type": "main", "index": 0 }]]
+    },
+    "IF des erreurs existent": {
+      "main": [[{ "node": "Alerter admin si erreurs", "type": "main", "index": 0 }], []]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

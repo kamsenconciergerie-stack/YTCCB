@@ -1,0 +1,283 @@
+{
+  "name": "CCB - Suivi Paiements (Wave + Orange Money)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "payment-webhook-wave",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-wave",
+      "name": "Webhook Wave",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1200, 200],
+      "webhookId": "ccb-payment-wave"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "payment-webhook-orange-money",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-orange-money",
+      "name": "Webhook Orange Money",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1200, 500],
+      "webhookId": "ccb-payment-orange-money"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'received' }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-wave",
+      "name": "Repondre 200 (Wave)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-980, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'received' }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-orange-money",
+      "name": "Repondre 200 (Orange Money)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-980, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verification de signature Wave (HMAC) avant tout traitement.\n// A adapter selon le mecanisme de signature exact documente par Wave.\nconst crypto = require('crypto');\nconst body = $input.first().json.body;\nconst headers = $input.first().json.headers;\n\nconst signature = headers['wave-signature'] || headers['x-wave-signature'];\nconst secret = $env.WAVE_WEBHOOK_SECRET;\n\nif (!signature || !secret) {\n  return [{ json: { error: true, provider: 'wave', message: 'Signature ou secret manquant, rejet par precaution.' } }];\n}\n\nconst computedSignature = crypto.createHmac('sha256', secret).update(JSON.stringify(body)).digest('hex');\n\nif (computedSignature !== signature) {\n  return [{ json: { error: true, provider: 'wave', message: 'Signature invalide, webhook potentiellement frauduleux rejete.' } }];\n}\n\nreturn [{\n  json: {\n    error: false,\n    provider: 'wave',\n    transactionId: body.id || body.transaction_id,\n    orderReference: body.client_reference || body.metadata?.orderId,\n    status: body.checkout_status || body.status,\n    amount: body.amount,\n    customerWhatsapp: body.metadata?.customerWhatsapp\n  }\n}];"
+      },
+      "id": "verify-wave-signature",
+      "name": "Verifier signature Wave",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-760, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verification de signature Orange Money avant tout traitement.\n// A adapter selon le mecanisme de signature exact documente par Orange Money Senegal.\nconst crypto = require('crypto');\nconst body = $input.first().json.body;\nconst headers = $input.first().json.headers;\n\nconst signature = headers['om-signature'] || headers['x-om-signature'];\nconst secret = $env.ORANGE_MONEY_WEBHOOK_SECRET;\n\nif (!signature || !secret) {\n  return [{ json: { error: true, provider: 'orange_money', message: 'Signature ou secret manquant, rejet par precaution.' } }];\n}\n\nconst computedSignature = crypto.createHmac('sha256', secret).update(JSON.stringify(body)).digest('hex');\n\nif (computedSignature !== signature) {\n  return [{ json: { error: true, provider: 'orange_money', message: 'Signature invalide, webhook potentiellement frauduleux rejete.' } }];\n}\n\nreturn [{\n  json: {\n    error: false,\n    provider: 'orange_money',\n    transactionId: body.transactionId || body.txnid,\n    orderReference: body.order_id || body.reference,\n    status: body.status,\n    amount: body.amount,\n    customerWhatsapp: body.customerWhatsapp\n  }\n}];"
+      },
+      "id": "verify-om-signature",
+      "name": "Verifier signature Orange Money",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-760, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.error }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-wave-error",
+      "name": "IF erreur signature Wave",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-540, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.error }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-om-error",
+      "name": "IF erreur signature Orange Money",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-540, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Idempotence cross-provider : un meme transactionId ne doit jamais etre traite deux fois.\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processedTransactionIds) staticData.processedTransactionIds = [];\n\nconst txId = $json.provider + ':' + $json.transactionId;\n\nif (staticData.processedTransactionIds.includes(txId)) {\n  return [{ json: { ...$json, skip: true, message: 'Transaction deja traitee (doublon webhook)' } }];\n}\n\nstaticData.processedTransactionIds.push(txId);\nif (staticData.processedTransactionIds.length > 1000) {\n  staticData.processedTransactionIds = staticData.processedTransactionIds.slice(-1000);\n}\n\nreturn [{ json: { ...$json, skip: false } }];"
+      },
+      "id": "dedupe-transaction",
+      "name": "Verifier doublon transaction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-300, 350]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.skip }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-duplicate-tx",
+      "name": "IF transaction doublon",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-80, 350]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalise les statuts heterogenes des deux providers vers un statut interne unique\nconst raw = ($json.status || '').toLowerCase();\n\nlet normalizedStatus;\nif (['success', 'succeeded', 'completed', 'paid'].includes(raw)) {\n  normalizedStatus = 'paye';\n} else if (['failed', 'cancelled', 'canceled', 'declined'].includes(raw)) {\n  normalizedStatus = 'echec';\n} else if (['pending', 'processing'].includes(raw)) {\n  normalizedStatus = 'en_attente';\n} else {\n  normalizedStatus = 'inconnu';\n}\n\nreturn [{\n  json: {\n    ...$json,\n    normalizedStatus\n  }\n}];"
+      },
+      "id": "normalize-status",
+      "name": "Normaliser statut paiement",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [140, 350]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/api/payments/webhook",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ provider: $json.provider, transactionId: $json.transactionId, orderReference: $json.orderReference, status: $json.normalizedStatus, amount: $json.amount }) }}",
+        "options": {}
+      },
+      "id": "update-payment-status",
+      "name": "Mettre a jour statut (API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [360, 350],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ccb-api-key-credential",
+          "name": "CCB API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $('Normaliser statut paiement').first().json.normalizedStatus }}", "rightValue": "paye", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-payment-success",
+      "name": "IF paiement reussi",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [580, 350]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construit le message de confirmation client apres paiement reussi\nconst order = $('Normaliser statut paiement').first().json;\nreturn [{\n  json: {\n    messaging_product: 'whatsapp',\n    to: order.customerWhatsapp,\n    type: 'text',\n    text: { body: 'Paiement recu avec succes ! Votre commande ' + (order.orderReference || '') + ' est confirmee et va etre preparee. Merci de votre confiance.' }\n  }\n}];"
+      },
+      "id": "build-payment-confirmation",
+      "name": "Construire confirmation paiement",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 260]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v19.0/' + $env.WHATSAPP_PHONE_NUMBER_ID + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "ignoreResponseCode": true }
+      },
+      "id": "send-confirmation-whatsapp",
+      "name": "Envoyer confirmation client",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1020, 260],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "whatsapp-token-credential",
+          "name": "WhatsApp Cloud API Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v19.0/' + $env.WHATSAPP_PHONE_NUMBER_ID + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $env.ADMIN_WHATSAPP_NUMBER, type: 'text', text: { body: 'Webhook paiement rejete (signature invalide). Provider: ' + ($json.provider || 'inconnu') + '. Verifier configuration secrets.' } }) }}",
+        "options": { "ignoreResponseCode": true }
+      },
+      "id": "alert-invalid-signature",
+      "name": "Alerter admin (signature invalide)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-300, 80],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "whatsapp-token-credential",
+          "name": "WhatsApp Cloud API Token"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Wave": {
+      "main": [[{ "node": "Repondre 200 (Wave)", "type": "main", "index": 0 }, { "node": "Verifier signature Wave", "type": "main", "index": 0 }]]
+    },
+    "Webhook Orange Money": {
+      "main": [[{ "node": "Repondre 200 (Orange Money)", "type": "main", "index": 0 }, { "node": "Verifier signature Orange Money", "type": "main", "index": 0 }]]
+    },
+    "Verifier signature Wave": {
+      "main": [[{ "node": "IF erreur signature Wave", "type": "main", "index": 0 }]]
+    },
+    "Verifier signature Orange Money": {
+      "main": [[{ "node": "IF erreur signature Orange Money", "type": "main", "index": 0 }]]
+    },
+    "IF erreur signature Wave": {
+      "main": [[{ "node": "Alerter admin (signature invalide)", "type": "main", "index": 0 }], [{ "node": "Verifier doublon transaction", "type": "main", "index": 0 }]]
+    },
+    "IF erreur signature Orange Money": {
+      "main": [[{ "node": "Alerter admin (signature invalide)", "type": "main", "index": 0 }], [{ "node": "Verifier doublon transaction", "type": "main", "index": 0 }]]
+    },
+    "Verifier doublon transaction": {
+      "main": [[{ "node": "IF transaction doublon", "type": "main", "index": 0 }]]
+    },
+    "IF transaction doublon": {
+      "main": [[], [{ "node": "Normaliser statut paiement", "type": "main", "index": 0 }]]
+    },
+    "Normaliser statut paiement": {
+      "main": [[{ "node": "Mettre a jour statut (API)", "type": "main", "index": 0 }]]
+    },
+    "Mettre a jour statut (API)": {
+      "main": [[{ "node": "IF paiement reussi", "type": "main", "index": 0 }]]
+    },
+    "IF paiement reussi": {
+      "main": [[{ "node": "Construire confirmation paiement", "type": "main", "index": 0 }], []]
+    },
+    "Construire confirmation paiement": {
+      "main": [[{ "node": "Envoyer confirmation client", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

@@ -1,0 +1,194 @@
+{
+  "name": "CCB - Alertes Commerciales Nouvelle Commande",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nouvelle-commande",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-new-order",
+      "name": "Webhook nouvelle commande",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1200, 300],
+      "webhookId": "ccb-nouvelle-commande"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'received' }) }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-ack",
+      "name": "Repondre 200 immediat",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-980, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Idempotence : verifie qu'on n'a pas deja traite cette commande\n// (un webhook peut etre renvoye plusieurs fois par le backend en cas de retry)\nconst body = $input.first().json.body;\nconst orderId = body.orderId || body.id;\n\nif (!orderId) {\n  return [{ json: { error: true, message: 'orderId manquant dans le payload' } }];\n}\n\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processedOrderIds) staticData.processedOrderIds = [];\n\nif (staticData.processedOrderIds.includes(orderId)) {\n  return [{ json: { error: true, message: 'Commande deja traitee (doublon webhook)', orderId, skip: true } }];\n}\n\n// Garder seulement les 500 derniers ids pour ne pas faire grossir staticData indefiniment\nstaticData.processedOrderIds.push(orderId);\nif (staticData.processedOrderIds.length > 500) {\n  staticData.processedOrderIds = staticData.processedOrderIds.slice(-500);\n}\n\nreturn [{\n  json: {\n    error: false,\n    orderId,\n    orderNumber: body.orderNumber || orderId,\n    customerWhatsapp: body.customer?.whatsappNumber || body.customerWhatsapp,\n    deliveryZoneId: body.deliveryZoneId,\n    deliveryAddress: body.deliveryAddress,\n    items: body.items || [],\n    total: body.total\n  }\n}];"
+      },
+      "id": "dedupe-order",
+      "name": "Verifier doublon (idempotence)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-760, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.error }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-error-or-duplicate",
+      "name": "IF erreur ou doublon",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-540, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.API_BASE_URL }}/api/sales-reps/by-zone/{{ $json.deliveryZoneId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": { "ignoreResponseCode": true }
+      },
+      "id": "resolve-sales-rep",
+      "name": "Resoudre commercial par zone",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-300, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ccb-api-key-credential",
+          "name": "CCB API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Si aucun commercial n'est associe a la zone, on tombe sur une rotation par defaut\n// ou sur un commercial \"general\" pour ne jamais perdre une commande sans suivi.\nconst response = $input.first().json;\nconst order = $('Verifier doublon (idempotence)').first().json;\n\nlet salesReps = response.body || response;\nif (!Array.isArray(salesReps) || salesReps.length === 0) {\n  // Fallback : pas de commercial assigne a cette zone -> on alerte un canal general\n  salesReps = [{ id: null, name: 'Equipe commerciale (non assignee)', whatsappNumber: $env.SALES_FALLBACK_WHATSAPP_NUMBER }];\n}\n\nreturn salesReps.map(rep => ({\n  json: {\n    ...order,\n    salesRepId: rep.id,\n    salesRepName: rep.name,\n    salesRepWhatsapp: rep.whatsappNumber\n  }\n}));"
+      },
+      "id": "prepare-rep-list",
+      "name": "Preparer liste commerciaux a notifier",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-80, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/api/leads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ orderId: $json.orderId, customerWhatsapp: $json.customerWhatsapp, status: 'nouveau', source: 'whatsapp_commande' }) }}",
+        "options": {}
+      },
+      "id": "create-lead",
+      "name": "Creer lead (pipeline commercial)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [140, 380],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ccb-api-key-credential",
+          "name": "CCB API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.API_BASE_URL }}/api/leads/{{ $json.id }}/assign",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ salesRepId: $('Preparer liste commerciaux a notifier').first().json.salesRepId }) }}",
+        "options": { "ignoreResponseCode": true }
+      },
+      "id": "assign-lead",
+      "name": "Assigner lead au commercial",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [360, 380],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ccb-api-key-credential",
+          "name": "CCB API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construit le texte recapitulatif de la commande pour le commercial\nconst rep = $('Preparer liste commerciaux a notifier').first().json;\n\nconst itemsText = (rep.items || []).map(i => `- ${i.quantity} x ${i.productName || i.productId}`).join('\\n');\n\nconst text = `Nouvelle commande CCB !\\n\\n` +\n  `Commande : ${rep.orderNumber}\\n` +\n  `Client : ${rep.customerWhatsapp}\\n` +\n  `Adresse : ${rep.deliveryAddress || 'non precisee'}\\n\\n` +\n  `Articles :\\n${itemsText}\\n\\n` +\n  (rep.total ? `Total : ${rep.total} FCFA\\n\\n` : '') +\n  `Voir la fiche : ${$env.ADMIN_BASE_URL}/admin/orders/${rep.orderId}`;\n\nreturn [{\n  json: {\n    messaging_product: 'whatsapp',\n    to: rep.salesRepWhatsapp,\n    type: 'text',\n    text: { body: text }\n  }\n}];"
+      },
+      "id": "build-alert-message",
+      "name": "Construire message alerte",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [580, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v19.0/' + $env.WHATSAPP_PHONE_NUMBER_ID + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "ignoreResponseCode": true }
+      },
+      "id": "send-alert-whatsapp",
+      "name": "Envoyer alerte WhatsApp au commercial",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "whatsapp-token-credential",
+          "name": "WhatsApp Cloud API Token"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook nouvelle commande": {
+      "main": [[{ "node": "Repondre 200 immediat", "type": "main", "index": 0 }, { "node": "Verifier doublon (idempotence)", "type": "main", "index": 0 }]]
+    },
+    "Verifier doublon (idempotence)": {
+      "main": [[{ "node": "IF erreur ou doublon", "type": "main", "index": 0 }]]
+    },
+    "IF erreur ou doublon": {
+      "main": [[], [{ "node": "Resoudre commercial par zone", "type": "main", "index": 0 }, { "node": "Creer lead (pipeline commercial)", "type": "main", "index": 0 }]]
+    },
+    "Resoudre commercial par zone": {
+      "main": [[{ "node": "Preparer liste commerciaux a notifier", "type": "main", "index": 0 }]]
+    },
+    "Preparer liste commerciaux a notifier": {
+      "main": [[{ "node": "Construire message alerte", "type": "main", "index": 0 }]]
+    },
+    "Creer lead (pipeline commercial)": {
+      "main": [[{ "node": "Assigner lead au commercial", "type": "main", "index": 0 }]]
+    },
+    "Construire message alerte": {
+      "main": [[{ "node": "Envoyer alerte WhatsApp au commercial", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}
