@@ -16,13 +16,13 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
       - name: Deploy to Railway
-        run: railway up --service ccb-web --detach
+        run: railway up --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: 6279d3ea-3d8a-46ef-b1b3-82b7005a0313
+          RAILWAY_SERVICE_ID: 75ea2e9e-cae9-4e95-9782-11f884e43c19
+          RAILWAY_ENVIRONMENT_ID: ddc3ed3c-876d-457d-833a-8b0e727fc900
