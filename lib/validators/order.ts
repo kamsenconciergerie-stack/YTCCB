@@ -12,7 +12,7 @@ export const OrderStatusSchema = z.enum([
 ]);
 
 export const OrderItemInputSchema = z.object({
-  productId: z.string().uuid(),
+  productId: z.string().min(1),
   quantity: z.number().int().positive(),
 });
 
@@ -24,7 +24,7 @@ export const CreateOrderSchema = z.object({
   customerName: z.string().min(1).max(100).optional(),
   channel: OrderChannelSchema,
   items: z.array(OrderItemInputSchema).min(1, "La commande doit contenir au moins un produit"),
-  deliveryZoneId: z.string().uuid().optional(),
+  deliveryZoneId: z.string().min(1).optional(),
   deliveryAddress: z.string().max(500).optional(),
   deliveryCity: z.string().max(100).optional(),
   notes: z.string().max(1000).optional(),
