@@ -1,0 +1,12 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "openssl"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npx prisma generate", "npx next build"]
+dependsOn = ["install"]
+
+[start]
+cmd = "npx next start -p ${PORT:-3000}"

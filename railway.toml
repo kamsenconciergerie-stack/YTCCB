@@ -1,9 +1,8 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm ci && npx prisma generate && npx next build"
 
 [deploy]
-startCommand = "npx next start -p ${PORT:-3000}"
+startCommand = "npx next start"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
