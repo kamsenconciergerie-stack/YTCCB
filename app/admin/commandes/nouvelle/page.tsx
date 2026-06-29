@@ -8,9 +8,9 @@ interface Zone { id: string; name: string; baseFee: string; }
 interface CartItem { productId: string; name: string; price: number; unit: string; quantity: number; }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  GROS_OEUVRE: "Gros œuvre", ETANCHEITE: "Étanchéité", CARRELAGE: "Carrelage",
-  PLOMBERIE: "Plomberie", ELECTRICITE: "Électricité", SANITAIRES: "Sanitaires",
-  ELECTROMENAGER: "Électroménager", SOLAIRE: "Solaire",
+  ESCARPINS: "Escarpins", SANDALES: "Sandales", BOTTES: "Bottes & Bottines",
+  MULES: "Mules & Sabots", BALLERINES: "Ballerines", BASKETS: "Baskets & Sneakers",
+  MOCASSINS: "Mocassins & Loafers", COMPENSEES: "Compensées & Plateformes",
 };
 
 export default function NouvelleCommandePage() {
@@ -77,7 +77,7 @@ export default function NouvelleCommandePage() {
     <div className="max-w-5xl space-y-6">
       <div className="flex items-center gap-3">
         <a href="/admin/commandes" className="text-sm text-gray-400 hover:text-gray-600">← Commandes</a>
-        <h1 className="text-2xl font-display font-semibold" style={{ color: "var(--ccb-green)" }}>Nouvelle commande</h1>
+        <h1 className="text-2xl font-display font-semibold" style={{ color: "var(--mts-primary)" }}>Nouvelle commande</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -86,7 +86,7 @@ export default function NouvelleCommandePage() {
           <div className="card p-5">
             <h2 className="font-semibold mb-3 text-sm text-gray-700">Produits</h2>
             <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher un produit..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-ccb-green-600/40" />
+              placeholder="Rechercher un produit..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-mts-primary-600/40" />
             <div className="max-h-64 overflow-y-auto space-y-1">
               {filtered.slice(0, 30).map((p) => (
                 <div key={p.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50">
@@ -131,12 +131,12 @@ export default function NouvelleCommandePage() {
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">WhatsApp *</label>
               <input type="tel" required value={form.customerWhatsapp} onChange={(e) => setForm((f) => ({ ...f, customerWhatsapp: e.target.value }))}
-                placeholder="+221 77 000 00 00" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ccb-green-600/40" />
+                placeholder="+221 77 000 00 00" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mts-primary-600/40" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Nom</label>
               <input type="text" value={form.customerName} onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))}
-                placeholder="Nom du client" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ccb-green-600/40" />
+                placeholder="Nom du client" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mts-primary-600/40" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Canal</label>
@@ -180,7 +180,7 @@ export default function NouvelleCommandePage() {
           <div className="card p-4 text-sm space-y-1">
             <div className="flex justify-between text-gray-500"><span>Sous-total</span><span>{formatPrice(subtotal)}</span></div>
             <div className="flex justify-between text-gray-500"><span>Livraison</span><span>{deliveryFee > 0 ? formatPrice(deliveryFee) : "—"}</span></div>
-            <div className="flex justify-between font-bold"><span>Total</span><span style={{ color: "var(--ccb-green)" }}>{formatPrice(subtotal + deliveryFee)}</span></div>
+            <div className="flex justify-between font-bold"><span>Total</span><span style={{ color: "var(--mts-primary)" }}>{formatPrice(subtotal + deliveryFee)}</span></div>
           </div>
 
           {error && <p className="text-red-600 text-sm bg-red-50 px-4 py-3 rounded-lg">{error}</p>}

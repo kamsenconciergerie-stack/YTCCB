@@ -1,109 +1,199 @@
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "Accueil",
-};
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
 
 const CATEGORIES = [
-  { label: "Gros œuvre",     emoji: "🏗️", slug: "GROS_OEUVRE" },
-  { label: "Étanchéité",     emoji: "🛡️", slug: "ETANCHEITE" },
-  { label: "Carrelage",      emoji: "🔲", slug: "CARRELAGE" },
-  { label: "Plomberie",      emoji: "🚿", slug: "PLOMBERIE" },
-  { label: "Électricité",    emoji: "⚡", slug: "ELECTRICITE" },
-  { label: "Sanitaires",     emoji: "🚽", slug: "SANITAIRES" },
-  { label: "Électroménager", emoji: "🏠", slug: "ELECTROMENAGER" },
-  { label: "Solaire",        emoji: "☀️", slug: "SOLAIRE" },
+  { label: "Escarpins",   emoji: "👠", slug: "ESCARPINS" },
+  { label: "Sandales",    emoji: "👡", slug: "SANDALES" },
+  { label: "Bottes",      emoji: "🥾", slug: "BOTTES" },
+  { label: "Sneakers",    emoji: "👟", slug: "SNEAKERS" },
+  { label: "Femme",       emoji: "👒", slug: "FEMME" },
+  { label: "Enfant",      emoji: "🧒", slug: "ENFANT" },
+  { label: "Sport",       emoji: "🏃", slug: "SPORT" },
+  { label: "Accessoires", emoji: "👜", slug: "ACCESSOIRES" },
 ];
 
-export default function HomePage() {
-  const waNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace("+", "") ?? "";
+const BANNER_ITEMS = [
+  "LIVRAISON DAKAR & BANLIEUE",
+  "PAIEMENT WAVE & ORANGE MONEY",
+  "RETOUR 7 JOURS",
+  "QUALITÉ GARANTIE",
+  "COMMANDEZ SUR WHATSAPP",
+  "NOUVELLE COLLECTION 2026",
+];
+
+async function getFeatured() {
+  return prisma.chaussure.findMany({
+    where: { actif: true, featured: true },
+    take: 8,
+    orderBy: { createdAt: "desc" },
+    select: { id: true, nom: true, prix: true, prixPromo: true, images: true, categorie: true },
+  });
+}
+
+async function getNewArrivals() {
+  return prisma.chaussure.findMany({
+    where: { actif: true },
+    take: 4,
+    orderBy: { createdAt: "desc" },
+    select: { id: true, nom: true, prix: true, prixPromo: true, images: true, categorie: true },
+  });
+}
+
+export default async function HomePage() {
+  const [featured, newArrivals] = await Promise.all([getFeatured(), getNewArrivals()]);
+  const waNumber = (process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "221700000000").replace("+", "");
 
   return (
-    <>
-      {/* Hero — fond bleu */}
-      <section
-        className="relative py-20 px-4 text-white text-center"
-        style={{ backgroundColor: "var(--ccb-green)" }}
-      >
-        <div className="max-w-3xl mx-auto">
-          {/* Logo CCB centré dans le hero */}
-          <div className="flex justify-center mb-6">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo.png"
-              alt="CCB Matériaux"
-              className="h-20 w-auto object-contain brightness-0 invert"
-            />
-          </div>
+    <div>
+      {/* ── Bannière défilante ─────────────────────── */}
+      <div className="bg-[#1A1A1A] text-white text-[10px] tracking-widest uppercase overflow-hidden py-2">
+        <div className="flex animate-marquee whitespace-nowrap">
+          {[...BANNER_ITEMS, ...BANNER_ITEMS].map((item, i) => (
+            <span key={i} className="mx-8">
+              <span className="text-[#C4956A]">✦</span> {item}
+            </span>
+          ))}
+        </div>
+      </div>
 
-          <h1 className="text-4xl sm:text-5xl font-display font-bold mb-4">
-            Vos matériaux de construction,{" "}
-            <span style={{ color: "var(--ccb-gold)" }}>livrés rapidement</span>
-          </h1>
-          <p className="text-lg text-white/80 mb-8">
-            Commandez en ligne ou sur WhatsApp — Dakar et régions
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="/catalogue" className="btn-primary bg-white text-base px-8 py-4" style={{ backgroundColor: "white", color: "var(--ccb-green)" }}>
-              Voir le catalogue
-            </a>
-            <a
-              href={`https://wa.me/${waNumber}?text=Bonjour%20CCB%2C%20je%20voudrais%20commander%20des%20mat%C3%A9riaux`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-gold text-base px-8 py-4"
-            >
-              Commander sur WhatsApp
-            </a>
+      {/* ── Hero ───────────────────────────────────── */}
+      <section className="bg-[#F5F5F5]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 grid md:grid-cols-2 gap-8 items-center">
+          <div>
+            <p className="text-[#C4956A] text-xs tracking-[0.3em] uppercase font-semibold mb-4">
+              Collection 2026
+            </p>
+            <h1 className="text-5xl md:text-7xl font-display font-black uppercase leading-none text-[#1A1A1A] mb-6">
+              Vos<br />
+              chaussures<br />
+              <span style={{ color: "#C4956A" }}>livrées</span>
+            </h1>
+            <p className="text-gray-500 text-base mb-8 max-w-md">
+              Boutique en ligne de chaussures à Dakar. Commandez en quelques clics, payez Wave ou Orange Money.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/catalogue" className="btn-noir px-8 py-4">Voir la boutique</Link>
+              <a
+                href={`https://wa.me/${waNumber}?text=Bonjour%2C%20je%20voudrais%20commander%20des%20chaussures`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-wa px-8 py-4"
+              >
+                💬 WhatsApp
+              </a>
+            </div>
+          </div>
+          <div className="hidden md:flex justify-center">
+            <div className="w-80 h-96 rounded-3xl flex items-center justify-center text-9xl"
+              style={{ background: "linear-gradient(135deg, #E8E8E8 0%, #F5F5F5 100%)" }}>
+              👠
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Catégories */}
+      {/* ── Catégories ─────────────────────────────── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h2
-          className="text-3xl font-display font-semibold text-center mb-10"
-          style={{ color: "var(--ccb-green)" }}
-        >
-          Nos catégories
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="text-center mb-10">
+          <h2 className="section-title">Nos Catégories</h2>
+          <p className="section-subtitle">Trouvez le modèle parfait pour chaque occasion</p>
+        </div>
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
           {CATEGORIES.map((cat) => (
-            <a
+            <Link
               key={cat.slug}
-              href={`/catalogue?category=${cat.slug}`}
-              className="card p-6 flex flex-col items-center gap-3 text-center group hover:border-ccb-green-600/30 transition-colors"
+              href={`/catalogue?categorie=${cat.slug}`}
+              className="flex flex-col items-center gap-2 p-4 hover:bg-[#F5F5F5] transition-colors group rounded"
             >
-              <span className="text-4xl">{cat.emoji}</span>
-              <span
-                className="font-semibold text-sm text-gray-700 group-hover:transition-colors"
-                style={{ color: "inherit" }}
-              >
-                {cat.label}
-              </span>
-            </a>
+              <span className="text-3xl group-hover:scale-110 transition-transform duration-200">{cat.emoji}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#1A1A1A] text-center">{cat.label}</span>
+            </Link>
           ))}
         </div>
       </section>
 
-      {/* CTA WhatsApp — fond bleu clair */}
-      <section className="bg-ccb-green-50 py-12 px-4 text-center">
-        <p className="text-lg font-medium text-gray-700 mb-4">
-          Besoin d&apos;un devis ou d&apos;un conseil ?
-        </p>
-        <a
-          href={`https://wa.me/${waNumber}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-gold inline-flex items-center gap-2 text-base px-8 py-4"
-        >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.557 4.126 1.532 5.862L.054 23.333a.5.5 0 0 0 .613.613l5.47-1.478A11.933 11.933 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.7-.513-5.243-1.41l-.375-.214-3.893 1.051 1.051-3.893-.214-.375A9.978 9.978 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
-          </svg>
-          Discuter sur WhatsApp
-        </a>
+      {/* ── Sélection featured ─────────────────────── */}
+      {featured.length > 0 && (
+        <section className="bg-[#F5F5F5] py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-end justify-between mb-10">
+              <div>
+                <h2 className="section-title">Sélection</h2>
+                <p className="section-subtitle">Nos coups de cœur</p>
+              </div>
+              <Link href="/catalogue?featured=true" className="text-sm font-semibold uppercase tracking-wider text-[#C4956A] hover:underline">
+                Voir tout →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {featured.map((ch) => <ProduitCard key={ch.id} ch={ch} />)}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Nouveautés ─────────────────────────────── */}
+      {newArrivals.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="flex items-end justify-between mb-10">
+            <div>
+              <h2 className="section-title">Nouveautés</h2>
+              <p className="section-subtitle">Derniers arrivages</p>
+            </div>
+            <Link href="/catalogue?sort=nouveautes" className="text-sm font-semibold uppercase tracking-wider text-[#C4956A] hover:underline">
+              Voir tout →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {newArrivals.map((ch) => <ProduitCard key={ch.id} ch={ch} />)}
+          </div>
+        </section>
+      )}
+
+      {/* ── Avantages ──────────────────────────────── */}
+      <section className="bg-[#1A1A1A] text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-10 text-center">
+          {[
+            { icon: "🚚", title: "Livraison rapide", desc: "Dakar, banlieue et régions. 24-48h." },
+            { icon: "💳", title: "Paiement sécurisé", desc: "Wave & Orange Money. Paiement à la livraison disponible." },
+            { icon: "↩️", title: "Retour facile", desc: "7 jours pour changer d'avis, contact WhatsApp." },
+          ].map((item) => (
+            <div key={item.title} className="flex flex-col items-center gap-3">
+              <span className="text-4xl">{item.icon}</span>
+              <h3 className="font-bold text-[#C4956A] uppercase tracking-widest text-xs">{item.title}</h3>
+              <p className="text-gray-400 text-sm max-w-xs">{item.desc}</p>
+            </div>
+          ))}
+        </div>
       </section>
-    </>
+    </div>
+  );
+}
+
+type ChMin = { id: string; nom: string; prix: unknown; prixPromo?: unknown; images: unknown; categorie: string };
+function ProduitCard({ ch }: { ch: ChMin }) {
+  const prix = Number(ch.prix);
+  const promo = ch.prixPromo ? Number(ch.prixPromo) : null;
+  const img = (ch.images as string[])?.[0];
+
+  return (
+    <Link href={`/catalogue/${ch.id}`} className="group block">
+      <div className="relative overflow-hidden bg-[#F5F5F5] aspect-square mb-3">
+        {promo && <span className="badge-promo">Promo</span>}
+        {img
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={img} alt={ch.nom} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          : <div className="w-full h-full flex items-center justify-center text-5xl text-gray-300">👠</div>
+        }
+      </div>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[#9CA3AF] mb-0.5">{ch.categorie}</p>
+      <p className="font-semibold text-[#1A1A1A] text-sm line-clamp-2">{ch.nom}</p>
+      <div className="flex items-baseline gap-2 mt-1">
+        {promo
+          ? <><span className="font-bold text-[#C4956A]">{promo.toLocaleString("fr-FR")} FCFA</span><span className="text-xs text-gray-400 line-through">{prix.toLocaleString("fr-FR")}</span></>
+          : <span className="font-bold text-[#1A1A1A]">{prix.toLocaleString("fr-FR")} FCFA</span>
+        }
+      </div>
+    </Link>
   );
 }

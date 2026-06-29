@@ -7,7 +7,7 @@ export function CartCount() {
     <a
       href="/panier"
       className="relative inline-flex items-center gap-1.5 transition-colors"
-      style={{ color: "var(--ccb-green)" }}
+      style={{ color: "var(--mts-primary)" }}
     >
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -17,7 +17,7 @@ export function CartCount() {
       {count > 0 && (
         <span
           className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
-          style={{ backgroundColor: "var(--ccb-gold)" }}
+          style={{ backgroundColor: "var(--mts-accent)" }}
         >
           {count > 9 ? "9+" : count}
         </span>

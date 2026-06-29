@@ -1,0 +1,86 @@
+{
+  "name": "MTS - 2. Paiement confirmé",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mts-paiement-confirme",
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-paiement",
+      "name": "Webhook Paiement Confirmé",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "mts-paiement-confirme"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.NEXT_PUBLIC_APP_URL }}/api/n8n/order-status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.INTERNAL_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "orderId", "value": "={{ $json.body.orderId }}" },
+            { "name": "status", "value": "PAYE" }
+          ]
+        }
+      },
+      "id": "update-status",
+      "name": "Marquer PAYE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $json.body.customerWhatsapp.replace('+', '') }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"✅ Votre paiement pour la commande *{{ $json.body.numeroCommande }}* a été reçu !\\n\\nNous préparons votre commande. Vous serez notifié dès l'expédition.\\n\\nMerci de votre confiance chez *Mor Talla Sandaga* 🎁\" }\n}"
+      },
+      "id": "notif-client",
+      "name": "Notifier client",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"received\": true }"
+      },
+      "id": "respond",
+      "name": "Répondre 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [720, 500]
+    }
+  ],
+  "connections": {
+    "Webhook Paiement Confirmé": { "main": [[{ "node": "Marquer PAYE", "type": "main", "index": 0 }]] },
+    "Marquer PAYE": {
+      "main": [[
+        { "node": "Notifier client", "type": "main", "index": 0 },
+        { "node": "Répondre 200", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "active": true,
+  "tags": ["MTS", "paiement", "wave"]
+}

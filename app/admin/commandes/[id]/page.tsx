@@ -1,119 +1,129 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { formatPrice, formatDate } from "@/lib/format";
+import { requireAdminSession } from "@/lib/admin-guard";
+import { redirect } from "next/navigation";
 import { StatusChanger } from "./StatusChanger";
 
 export const dynamic = "force-dynamic";
 
+const STATUS_CSS: Record<string, string> = {
+  PRE_CONFIRMEE: "badge-status-pre-confirmee",
+  PAYE:          "badge-status-paye",
+  EN_PREPARATION:"badge-status-en-preparation",
+  EN_LIVRAISON:  "badge-status-en-livraison",
+  LIVREE:        "badge-status-livree",
+  EXPIREE:       "badge-status-expiree",
+  ANNULEE:       "badge-status-annulee",
+};
+
 const STATUS_LABELS: Record<string, string> = {
-  PRE_CONFIRMED: "Pré-confirmée", CONFIRMED: "Confirmée",
-  IN_PREPARATION: "En préparation", IN_DELIVERY: "En livraison",
-  DELIVERED: "Livrée", CANCELLED: "Annulée",
-};
-const STATUS_COLORS: Record<string, string> = {
-  PRE_CONFIRMED: "bg-yellow-100 text-yellow-800", CONFIRMED: "bg-blue-100 text-blue-800",
-  IN_PREPARATION: "bg-purple-100 text-purple-800", IN_DELIVERY: "bg-orange-100 text-orange-800",
-  DELIVERED: "bg-green-100 text-green-800", CANCELLED: "bg-red-100 text-red-800",
-};
-const CHANNEL_LABELS: Record<string, string> = {
-  WHATSAPP: "WhatsApp", WEB: "Web", MANUAL: "Saisie manuelle", PHONE: "Téléphone",
-};
-const PAYMENT_LABELS: Record<string, string> = {
-  WAVE: "Wave", ORANGE_MONEY: "Orange Money", ON_DELIVERY: "À la livraison",
+  PRE_CONFIRMEE: "Pré-confirmée", PAYE: "Payée",
+  EN_PREPARATION: "En préparation", EN_LIVRAISON: "En livraison",
+  LIVREE: "Livrée", EXPIREE: "Expirée", ANNULEE: "Annulée",
 };
 
-export default async function OrderDetailPage({ params }: { params: { id: string } }) {
-  const order = await prisma.order.findUnique({
-    where: { id: params.id },
-    include: {
-      customer: true,
-      deliveryZone: { select: { name: true } },
-      items: true,
-      payments: { orderBy: { createdAt: "desc" } },
-    },
-  });
+export default async function CommandeDetailPage({ params }: { params: { id: string } }) {
+  const { error } = await requireAdminSession();
+  if (error) redirect("/admin/login");
 
-  if (!order) notFound();
+  const [commande, livreurs] = await Promise.all([
+    prisma.order.findUnique({
+      where: { id: params.id },
+      include: {
+        customer: true,
+        deliveryZone: true,
+        livreur: true,
+        items: { include: { chaussure: { select: { images: true } } } },
+        payments: { orderBy: { createdAt: "desc" }, take: 1 },
+      },
+    }),
+    prisma.livreur.findMany({ where: { actif: true }, select: { id: true, nom: true, disponible: true } }),
+  ]);
+
+  if (!commande) notFound();
 
   return (
-    <div className="max-w-3xl space-y-5">
-      <div className="flex items-center gap-3">
-        <a href="/admin/commandes" className="text-sm text-gray-400 hover:text-gray-600">← Commandes</a>
-        <h1 className="text-xl font-display font-bold font-mono" style={{ color: "var(--ccb-green)" }}>
-          {order.orderNumber}
-        </h1>
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[order.status]}`}>
-          {STATUS_LABELS[order.status]}
-        </span>
+    <div className="max-w-3xl">
+      <div className="flex items-center gap-3 mb-6">
+        <Link href="/admin/commandes" className="text-sm text-gray-400 hover:text-[#C4956A]">← Commandes</Link>
+        <h1 className="text-xl font-black uppercase">{commande.numeroCommande}</h1>
+        <span className={STATUS_CSS[commande.status] ?? ""}>{STATUS_LABELS[commande.status]}</span>
       </div>
 
-      <StatusChanger orderId={order.id} currentStatus={order.status} />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="grid md:grid-cols-2 gap-6 mb-6">
         {/* Client */}
-        <div className="card p-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Client</h3>
-          <p className="font-semibold">{order.customer.name ?? "—"}</p>
-          <p className="text-sm text-gray-500">{order.customer.whatsappNumber}</p>
-          {order.customer.email && <p className="text-sm text-gray-500">{order.customer.email}</p>}
+        <div className="bg-white border border-gray-100 rounded p-5">
+          <h2 className="font-bold uppercase tracking-wider text-xs text-gray-500 mb-3">Client</h2>
+          <p className="font-semibold">{commande.customer?.name ?? "—"}</p>
+          <p className="text-sm text-gray-500">{commande.customer?.whatsappNumber}</p>
+          {commande.deliveryAddress && (
+            <p className="text-sm text-gray-500 mt-2">📍 {commande.deliveryAddress}, {commande.deliveryCity}</p>
+          )}
+          <p className="text-xs text-gray-400 mt-1">Zone : {commande.deliveryZone?.name ?? "—"}</p>
         </div>
 
-        {/* Livraison */}
-        <div className="card p-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Livraison</h3>
-          <p className="text-sm font-medium">{order.deliveryZone?.name ?? "Non précisé"}</p>
-          {order.deliveryAddress && <p className="text-sm text-gray-500">{order.deliveryAddress}</p>}
-          {order.deliveryCity && <p className="text-sm text-gray-500">{order.deliveryCity}</p>}
-          <p className="text-sm text-gray-400 mt-1">Canal : {CHANNEL_LABELS[order.channel]}</p>
-          <p className="text-xs text-gray-400 mt-1">Créée le {formatDate(order.createdAt)}</p>
+        {/* Paiement */}
+        <div className="bg-white border border-gray-100 rounded p-5">
+          <h2 className="font-bold uppercase tracking-wider text-xs text-gray-500 mb-3">Paiement</h2>
+          <p className="text-sm">Canal : <strong>{commande.canalFinalisation === "WHATSAPP" ? "💬 WhatsApp" : "🌐 Web"}</strong></p>
+          <p className="text-sm">Statut paiement : <strong>{commande.statutPaiement}</strong></p>
+          {commande.paidAt && <p className="text-xs text-gray-400">Payé le {new Date(commande.paidAt).toLocaleString("fr-FR")}</p>}
+          <p className="text-sm mt-2">Livreur : <strong>{commande.livreur?.nom ?? "Non assigné"}</strong></p>
+          {commande.expiresAt && commande.status === "PRE_CONFIRMEE" && (
+            <p className="text-xs text-orange-600 mt-1">⏰ Expire le {new Date(commande.expiresAt).toLocaleString("fr-FR")}</p>
+          )}
         </div>
       </div>
 
       {/* Articles */}
-      <div className="card overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-400">
-          Articles ({order.items.length})
+      <div className="bg-white border border-gray-100 rounded p-5 mb-6">
+        <h2 className="font-bold uppercase tracking-wider text-xs text-gray-500 mb-4">Articles</h2>
+        <div className="divide-y divide-gray-50">
+          {commande.items.map((it) => {
+            const img = (it.chaussure?.images as string[])?.[0];
+            return (
+              <div key={it.id} className="flex items-center gap-3 py-3">
+                <div className="w-12 h-12 bg-[#F5F5F5] flex items-center justify-center shrink-0">
+                  {img
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={img} alt={it.chaussureNom} className="w-full h-full object-cover" />
+                    : <span className="text-2xl">👟</span>
+                  }
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">{it.chaussureNom}</p>
+                  <p className="text-xs text-gray-400">{it.chaussureRef}{it.pointure ? ` — Pointure ${it.pointure}` : ""}{it.couleur ? ` — ${it.couleur}` : ""}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-400">×{it.quantity}</p>
+                  <p className="font-semibold text-sm">{Number(it.totalPrice).toLocaleString("fr-FR")} F</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
-        <table className="w-full text-sm">
-          <tbody className="divide-y divide-gray-50">
-            {order.items.map((item) => (
-              <tr key={item.id}>
-                <td className="px-5 py-3 text-gray-800">
-                  {item.productName}
-                  {item.productSku && <span className="text-xs text-gray-400 ml-1">#{item.productSku}</span>}
-                </td>
-                <td className="px-5 py-3 text-gray-500 text-right">{item.quantity} {item.unit}</td>
-                <td className="px-5 py-3 text-gray-500 text-right">{formatPrice(item.unitPrice)}</td>
-                <td className="px-5 py-3 font-semibold text-right">{formatPrice(item.totalPrice)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 text-sm space-y-1">
-          <div className="flex justify-between text-gray-500"><span>Sous-total</span><span>{formatPrice(order.subtotal)}</span></div>
-          <div className="flex justify-between text-gray-500"><span>Livraison</span><span>{formatPrice(order.deliveryFee)}</span></div>
-          <div className="flex justify-between font-bold"><span>Total</span><span style={{ color: "var(--ccb-green)" }}>{formatPrice(order.total)}</span></div>
+        <div className="border-t border-gray-100 pt-3 mt-3 space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Sous-total</span>
+            <span>{Number(commande.subtotal).toLocaleString("fr-FR")} FCFA</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Livraison</span>
+            <span>{Number(commande.deliveryFee).toLocaleString("fr-FR")} FCFA</span>
+          </div>
+          <div className="flex justify-between font-black text-base">
+            <span>Total</span>
+            <span className="text-[#C4956A]">{Number(commande.total).toLocaleString("fr-FR")} FCFA</span>
+          </div>
         </div>
+
+        <StatusChanger orderId={commande.id} currentStatus={commande.status} livreurs={livreurs} />
       </div>
 
-      {/* Paiements */}
-      {order.payments.length > 0 && (
-        <div className="card p-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Paiement</h3>
-          {order.payments.map((p) => (
-            <div key={p.id} className="flex items-center justify-between text-sm">
-              <span>{PAYMENT_LABELS[p.provider] ?? p.provider}</span>
-              <span className="text-gray-500">{p.status}</span>
-              <span className="font-semibold">{formatPrice(p.amount)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {order.notes && (
-        <div className="card p-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Notes</h3>
-          <p className="text-sm text-gray-600">{order.notes}</p>
+      {commande.notes && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded p-4 text-sm">
+          <strong>Notes :</strong> {commande.notes}
         </div>
       )}
     </div>

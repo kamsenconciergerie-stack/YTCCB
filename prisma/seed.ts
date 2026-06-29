@@ -1,236 +1,238 @@
-import { PrismaClient, ProductCategory } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { hash } from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding CCB database...");
+  console.log("🌱 Seeding Mor Talla Sandaga...");
 
-  // ── Zones de livraison ─────────────────────────────────────────────────────
+  // ── Zones de livraison ─────────────────────────────────────────
   const zones = await Promise.all([
     prisma.deliveryZone.upsert({
       where: { id: "zone-dakar-centre" },
       update: {},
-      create: {
-        id: "zone-dakar-centre",
-        name: "Dakar Centre",
-        description: "Plateau, Médina, Fann, Mermoz, Point E",
-        baseFee: 2000,
-      },
+      create: { id: "zone-dakar-centre", name: "Dakar Centre", baseFee: 1500, isActive: true },
     }),
     prisma.deliveryZone.upsert({
-      where: { id: "zone-dakar-banlieue" },
+      where: { id: "zone-banlieue" },
       update: {},
-      create: {
-        id: "zone-dakar-banlieue",
-        name: "Dakar Banlieue",
-        description: "Pikine, Guédiawaye, Parcelles Assainies, Thiaroye",
-        baseFee: 3000,
-      },
-    }),
-    prisma.deliveryZone.upsert({
-      where: { id: "zone-rufisque" },
-      update: {},
-      create: {
-        id: "zone-rufisque",
-        name: "Rufisque / Bargny",
-        description: "Rufisque, Bargny, Diamniadio, Sébikotane",
-        baseFee: 4000,
-      },
+      create: { id: "zone-banlieue", name: "Banlieue Dakar", baseFee: 2000, isActive: true },
     }),
     prisma.deliveryZone.upsert({
       where: { id: "zone-thies" },
       update: {},
-      create: {
-        id: "zone-thies",
-        name: "Thiès",
-        description: "Ville de Thiès et environs",
-        baseFee: 6000,
-      },
+      create: { id: "zone-thies", name: "Thiès", baseFee: 3500, isActive: true },
     }),
     prisma.deliveryZone.upsert({
       where: { id: "zone-saint-louis" },
       update: {},
-      create: {
-        id: "zone-saint-louis",
-        name: "Saint-Louis",
-        baseFee: 12000,
-      },
+      create: { id: "zone-saint-louis", name: "Saint-Louis", baseFee: 5000, isActive: true },
     }),
   ]);
+  console.log(`✅ ${zones.length} zones de livraison`);
 
-  console.log(`✅ ${zones.length} zones de livraison créées`);
+  // ── Utilisateurs admin ─────────────────────────────────────────
+  const adminHash = await hash("MTS@admin2026!", 12);
+  const commHash  = await hash("MTS@comm2026!", 12);
 
-  // ── Commerciaux ─────────────────────────────────────────────────────────────
-  const salesRep = await prisma.salesRep.upsert({
-    where: { whatsappNumber: "+221770000001" },
-    update: {},
-    create: {
-      id: "rep-demo",
-      name: "Commercial Démo",
-      whatsappNumber: "+221770000001",
-      email: "commercial@ccbmateriaux.com",
-      deliveryZoneId: "zone-dakar-centre",
-    },
-  });
-
-  console.log(`✅ Commercial démo créé : ${salesRep.name}`);
-
-  // ── Utilisateurs admin ───────────────────────────────────────────────────────
-  const adminPasswordHash = await hash("changeme-admin-2024!", 12);
-  const admin = await prisma.user.upsert({
-    where: { email: "admin@ccbmateriaux.com" },
-    update: {},
-    create: {
-      email: "admin@ccbmateriaux.com",
-      passwordHash: adminPasswordHash,
-      name: "Administrateur CCB",
-      role: "ADMIN",
-    },
-  });
-
-  console.log(`✅ Admin créé : ${admin.email} (mot de passe à changer impérativement)`);
-
-  const commercialPasswordHash = await hash("changeme-commercial-2024!", 12);
   await prisma.user.upsert({
-    where: { email: "commercial@ccbmateriaux.com" },
+    where: { email: "admin@mortalla.com" },
     update: {},
-    create: {
-      email: "commercial@ccbmateriaux.com",
-      passwordHash: commercialPasswordHash,
-      name: "Commercial Démo",
-      role: "COMMERCIAL",
-      salesRepId: "rep-demo",
-    },
+    create: { email: "admin@mortalla.com", passwordHash: adminHash, name: "Administrateur MTS", role: "ADMIN" },
   });
+  await prisma.user.upsert({
+    where: { email: "commercial@mortalla.com" },
+    update: {},
+    create: { email: "commercial@mortalla.com", passwordHash: commHash, name: "Commercial MTS", role: "COMMERCIAL" },
+  });
+  console.log("✅ 2 utilisateurs admin");
 
-  console.log("✅ Compte commercial démo créé");
+  // ── Livreurs ───────────────────────────────────────────────────
+  await prisma.livreur.upsert({
+    where: { telephone: "+221771234567" },
+    update: {},
+    create: { nom: "Mamadou Diallo", telephone: "+221771234567", whatsappNumber: "+221771234567", deliveryZoneId: "zone-dakar-centre", actif: true, disponible: true },
+  });
+  await prisma.livreur.upsert({
+    where: { telephone: "+221781234567" },
+    update: {},
+    create: { nom: "Ibrahima Sow", telephone: "+221781234567", whatsappNumber: "+221781234567", deliveryZoneId: "zone-banlieue", actif: true, disponible: true },
+  });
+  console.log("✅ 2 livreurs");
 
-  // ── Produits exemples (catalogue minimal pour tests) ─────────────────────────
-  const sampleProducts: Array<{
-    id: string;
-    name: string;
-    slug: string;
-    category: ProductCategory;
-    price: number;
-    stockQty: number;
-    unit: string;
-    description?: string;
-  }> = [
-    // Gros œuvre
+  // ── Catalogue chaussures ───────────────────────────────────────
+  const chaussures = [
     {
-      id: "prod-ciment-50kg",
-      name: "Ciment Portland CPA 325 — sac 50 kg",
-      slug: "ciment-portland-cpa-325-50kg",
-      category: "GROS_OEUVRE",
-      price: 5500,
-      stockQty: 200,
-      unit: "sac",
-      description: "Ciment Portland artificiel CPA 325, idéal pour béton armé et maçonnerie",
+      reference: "MTS-2026-001",
+      nom: "Escarpin Élégance Noir",
+      marque: "MTS Collection",
+      categorie: "ESCARPINS" as const,
+      couleur: "Noir",
+      pointuresDisponibles: ["36", "37", "38", "39", "40", "41"],
+      prix: 25000,
+      stockTotal: 30,
+      stocksParPointure: { "36": 5, "37": 6, "38": 7, "39": 6, "40": 4, "41": 2 },
+      description: "Escarpin classique à talon aiguille 10 cm, cuir verni noir. Parfait pour vos soirées.",
+      images: ["/demo/escarpin-noir.jpg"],
+      featured: true,
+      sourceImport: "MANUEL" as const,
     },
     {
-      id: "prod-fer-rond-10mm",
-      name: "Fer à béton HA10 — barre 12m",
-      slug: "fer-beton-ha10-12m",
-      category: "GROS_OEUVRE",
-      price: 8500,
-      stockQty: 150,
-      unit: "barre",
-      description: "Acier HA 10mm pour béton armé, longueur 12 mètres",
+      reference: "MTS-2026-002",
+      nom: "Sandales Dorées Festival",
+      marque: "MTS Collection",
+      categorie: "SANDALES" as const,
+      couleur: "Or",
+      pointuresDisponibles: ["36", "37", "38", "39", "40"],
+      prix: 18000,
+      prixPromo: 14500,
+      stockTotal: 25,
+      stocksParPointure: { "36": 5, "37": 6, "38": 8, "39": 4, "40": 2 },
+      description: "Sandales plates dorées à lanières, légères et élégantes pour l'été.",
+      images: ["/demo/sandales-or.jpg"],
+      featured: true,
+      sourceImport: "MANUEL" as const,
     },
-    // Carrelage
     {
-      id: "prod-carrelage-60x60",
-      name: "Carrelage grès cérame 60×60 — blanc mat",
-      slug: "carrelage-gres-cerame-60x60-blanc-mat",
-      category: "CARRELAGE",
-      price: 12000,
-      stockQty: 80,
-      unit: "m²",
-      description: "Carrelage intérieur/extérieur antidérapant, finition mate",
+      reference: "MTS-2026-003",
+      nom: "Bottines Chelsea Cognac",
+      marque: "MTS Collection",
+      categorie: "BOTTES" as const,
+      couleur: "Cognac",
+      pointuresDisponibles: ["37", "38", "39", "40", "41"],
+      prix: 35000,
+      stockTotal: 20,
+      stocksParPointure: { "37": 4, "38": 6, "39": 5, "40": 3, "41": 2 },
+      description: "Bottines Chelsea en cuir cognac, semelle compensée 4 cm. Confort optimal.",
+      images: ["/demo/bottines-cognac.jpg"],
+      featured: true,
+      sourceImport: "MANUEL" as const,
     },
-    // Plomberie
     {
-      id: "prod-tuyau-pvc-32",
-      name: "Tuyau PVC pression 32mm — barre 6m",
-      slug: "tuyau-pvc-pression-32mm-6m",
-      category: "PLOMBERIE",
-      price: 3500,
-      stockQty: 120,
-      unit: "barre",
+      reference: "MTS-2026-004",
+      nom: "Sneakers Blanc Cassé Premium",
+      marque: "MTS Sport",
+      categorie: "SNEAKERS" as const,
+      couleur: "Blanc",
+      pointuresDisponibles: ["36", "37", "38", "39", "40", "41", "42"],
+      prix: 22000,
+      stockTotal: 40,
+      stocksParPointure: { "36": 5, "37": 7, "38": 8, "39": 8, "40": 6, "41": 4, "42": 2 },
+      description: "Sneakers unisexe à semelle épaisse, matière respirante. Style décontracté.",
+      images: ["/demo/sneakers-blanc.jpg"],
+      featured: true,
+      sourceImport: "MANUEL" as const,
     },
-    // Électricité
     {
-      id: "prod-cable-1-5mm",
-      name: "Câble électrique 1,5mm² — rouleau 100m",
-      slug: "cable-electrique-1-5mm-100m",
-      category: "ELECTRICITE",
-      price: 18000,
-      stockQty: 50,
-      unit: "rouleau",
+      reference: "MTS-2026-005",
+      nom: "Mules Tissu Wax Coloré",
+      marque: "MTS Afrique",
+      categorie: "FEMME" as const,
+      couleur: "Multicolore",
+      pointuresDisponibles: ["36", "37", "38", "39", "40"],
+      prix: 12000,
+      stockTotal: 35,
+      stocksParPointure: { "36": 7, "37": 8, "38": 8, "39": 7, "40": 5 },
+      description: "Mules ouvertes en tissu wax authentique, motifs africains. Fabrication artisanale.",
+      images: ["/demo/mules-wax.jpg"],
+      featured: false,
+      sourceImport: "MANUEL" as const,
     },
-    // Étanchéité
     {
-      id: "prod-membrane-toiture",
-      name: "Membrane d'étanchéité bitumineuse 4mm — rouleau 10m²",
-      slug: "membrane-etancheite-bitumineuse-4mm",
-      category: "ETANCHEITE",
-      price: 22000,
-      stockQty: 35,
-      unit: "rouleau",
+      reference: "MTS-2026-006",
+      nom: "Ballerines Rose Poudré",
+      marque: "MTS Douceur",
+      categorie: "FEMME" as const,
+      couleur: "Rose poudré",
+      pointuresDisponibles: ["35", "36", "37", "38", "39"],
+      prix: 15000,
+      prixPromo: 11000,
+      stockTotal: 28,
+      stocksParPointure: { "35": 4, "36": 6, "37": 8, "38": 6, "39": 4 },
+      description: "Ballerines confort en satin rose poudré avec nœud décoratif. Légères et élégantes.",
+      images: ["/demo/ballerines-rose.jpg"],
+      featured: false,
+      sourceImport: "MANUEL" as const,
     },
-    // Solaire
     {
-      id: "prod-panneau-solaire-200w",
-      name: "Panneau solaire monocristallin 200W",
-      slug: "panneau-solaire-monocristallin-200w",
-      category: "SOLAIRE",
-      price: 85000,
-      stockQty: 20,
-      unit: "unité",
-      description: "Panneau solaire 200Wc, rendement 21%, garantie 25 ans",
+      reference: "MTS-2026-007",
+      nom: "Chaussures Sport Enfant Colorées",
+      marque: "MTS Kids",
+      categorie: "ENFANT" as const,
+      couleur: "Multicolore",
+      pointuresDisponibles: ["28", "29", "30", "31", "32", "33", "34", "35"],
+      prix: 9500,
+      stockTotal: 50,
+      stocksParPointure: { "28": 6, "29": 7, "30": 8, "31": 8, "32": 7, "33": 6, "34": 5, "35": 3 },
+      description: "Chaussures sport enfant légères, semelle antidérapante, velcro. Pour l'école et les loisirs.",
+      images: ["/demo/chaussures-enfant.jpg"],
+      featured: false,
+      sourceImport: "MANUEL" as const,
     },
-    // Sanitaires
     {
-      id: "prod-wc-suspendu",
-      name: "WC suspendu céramique blanc — pack complet",
-      slug: "wc-suspendu-ceramique-blanc",
-      category: "SANITAIRES",
-      price: 95000,
-      stockQty: 15,
-      unit: "unité",
+      reference: "MTS-2026-008",
+      nom: "Escarpins Dorés Soirée",
+      marque: "MTS Luxe",
+      categorie: "ESCARPINS" as const,
+      couleur: "Or",
+      pointuresDisponibles: ["36", "37", "38", "39", "40"],
+      prix: 32000,
+      stockTotal: 15,
+      stocksParPointure: { "36": 3, "37": 4, "38": 4, "39": 3, "40": 1 },
+      description: "Escarpins stiletto dorés à bride cheville. Talon 12 cm. Pour vos mariages et cérémonies.",
+      images: ["/demo/escarpins-or.jpg"],
+      featured: true,
+      sourceImport: "MANUEL" as const,
     },
-    // Électroménager
     {
-      id: "prod-climatiseur-9000btu",
-      name: "Climatiseur split 9000 BTU — inverter",
-      slug: "climatiseur-split-9000-btu-inverter",
-      category: "ELECTROMENAGER",
-      price: 280000,
-      stockQty: 8,
-      unit: "unité",
-      description: "Climatiseur inverter basse consommation, classe énergétique A++",
+      reference: "MTS-2026-009",
+      nom: "Sandales Plates Confort Cuir",
+      marque: "MTS Everyday",
+      categorie: "SANDALES" as const,
+      couleur: "Marron",
+      pointuresDisponibles: ["36", "37", "38", "39", "40", "41"],
+      prix: 16500,
+      stockTotal: 32,
+      stocksParPointure: { "36": 5, "37": 6, "38": 7, "39": 7, "40": 5, "41": 2 },
+      description: "Sandales plates en cuir naturel, semelle anatomique. Idéales pour marcher toute la journée.",
+      images: ["/demo/sandales-cuir.jpg"],
+      featured: false,
+      sourceImport: "MANUEL" as const,
     },
   ];
 
-  for (const product of sampleProducts) {
-    await prisma.product.upsert({
-      where: { id: product.id },
+  let count = 0;
+  for (const ch of chaussures) {
+    await prisma.chaussure.upsert({
+      where: { reference: ch.reference },
       update: {},
-      create: product,
+      create: { ...ch, actif: true, dateImport: new Date() },
     });
+    count++;
   }
+  console.log(`✅ ${count} chaussures`);
 
-  console.log(`✅ ${sampleProducts.length} produits exemples créés`);
-  console.log("\n🎉 Seed terminé avec succès !");
-  console.log("\n⚠️  IMPORTANT : Changer les mots de passe par défaut avant tout déploiement !");
+  // ── Paramètres boutique ────────────────────────────────────────
+  await prisma.parametresBoutique.upsert({
+    where: { cle: "NOM_BOUTIQUE" },
+    update: {},
+    create: { cle: "NOM_BOUTIQUE", valeur: "Mor Talla Sandaga" },
+  });
+  await prisma.parametresBoutique.upsert({
+    where: { cle: "TEL_WHATSAPP" },
+    update: {},
+    create: { cle: "TEL_WHATSAPP", valeur: "+221770000000" },
+  });
+  await prisma.parametresBoutique.upsert({
+    where: { cle: "DELAI_EXPIRATION_CMD_MINUTES" },
+    update: {},
+    create: { cle: "DELAI_EXPIRATION_CMD_MINUTES", valeur: "30" },
+  });
+  console.log("✅ Paramètres boutique");
+
+  console.log("🎉 Seed terminé !");
 }
 
 main()
-  .catch((e) => {
-    console.error("❌ Erreur seed :", e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(() => prisma.$disconnect());

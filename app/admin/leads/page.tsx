@@ -80,16 +80,16 @@ export default function LeadsPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-display font-semibold" style={{ color: "var(--ccb-green)" }}>Pipeline commercial</h1>
+        <h1 className="text-2xl font-display font-semibold" style={{ color: "var(--mts-primary)" }}>Pipeline commercial</h1>
         <button onClick={() => setShowNew(!showNew)} className="btn-gold text-sm px-4 py-2">+ Nouveau lead</button>
       </div>
 
       {showNew && (
         <form onSubmit={createLead} className="card p-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <input required type="text" placeholder="Nom" value={newForm.name} onChange={(e) => setNewForm((f) => ({ ...f, name: e.target.value }))}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ccb-green-600/40" />
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mts-primary-600/40" />
           <input required type="tel" placeholder="WhatsApp *" value={newForm.whatsappNumber} onChange={(e) => setNewForm((f) => ({ ...f, whatsappNumber: e.target.value }))}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ccb-green-600/40" />
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mts-primary-600/40" />
           <input type="text" placeholder="Entreprise" value={newForm.company} onChange={(e) => setNewForm((f) => ({ ...f, company: e.target.value }))}
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none" />
           <div className="flex gap-2">
@@ -121,7 +121,7 @@ export default function LeadsPage() {
                         <p className="text-xs text-gray-400">{lead.whatsappNumber}</p>
                       )}
                       {lead.estimatedValue && (
-                        <p className="text-xs font-medium mt-1" style={{ color: "var(--ccb-gold)" }}>
+                        <p className="text-xs font-medium mt-1" style={{ color: "var(--mts-accent)" }}>
                           {formatPrice(lead.estimatedValue)}
                         </p>
                       )}

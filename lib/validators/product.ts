@@ -1,14 +1,14 @@
 import { z } from "zod";
 
 export const ProductCategorySchema = z.enum([
-  "GROS_OEUVRE",
-  "ETANCHEITE",
-  "CARRELAGE",
-  "PLOMBERIE",
-  "ELECTRICITE",
-  "SANITAIRES",
-  "ELECTROMENAGER",
-  "SOLAIRE",
+  "ESCARPINS",
+  "SANDALES",
+  "BOTTES",
+  "MULES",
+  "BALLERINES",
+  "BASKETS",
+  "MOCASSINS",
+  "COMPENSEES",
 ]);
 
 export const CreateProductSchema = z.object({

@@ -1,117 +1,179 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { ProductCard } from "@/components/ProductCard";
-import { SearchInput } from "./SearchInput";
 
-export const metadata: Metadata = { title: "Catalogue" };
+export const metadata: Metadata = {
+  title: "Boutique | Mor Talla Sandaga",
+  description: "Toutes nos chaussures — escarpins, sandales, bottes, sneakers et plus.",
+};
 
 const CATEGORIES = [
-  { label: "Gros œuvre",     value: "GROS_OEUVRE" },
-  { label: "Étanchéité",     value: "ETANCHEITE" },
-  { label: "Carrelage",      value: "CARRELAGE" },
-  { label: "Plomberie",      value: "PLOMBERIE" },
-  { label: "Électricité",    value: "ELECTRICITE" },
-  { label: "Sanitaires",     value: "SANITAIRES" },
-  { label: "Électroménager", value: "ELECTROMENAGER" },
-  { label: "Solaire",        value: "SOLAIRE" },
-] as const;
+  { label: "Tout", slug: "" },
+  { label: "Escarpins", slug: "ESCARPINS" },
+  { label: "Sandales", slug: "SANDALES" },
+  { label: "Bottes", slug: "BOTTES" },
+  { label: "Sneakers", slug: "SNEAKERS" },
+  { label: "Femme", slug: "FEMME" },
+  { label: "Homme", slug: "HOMME" },
+  { label: "Enfant", slug: "ENFANT" },
+  { label: "Sport", slug: "SPORT" },
+  { label: "Accessoires", slug: "ACCESSOIRES" },
+];
 
-type Category = (typeof CATEGORIES)[number]["value"];
+type Props = { searchParams?: { categorie?: string; sort?: string; q?: string; page?: string } };
 
-export default async function CataloguePage({
-  searchParams,
-}: {
-  searchParams: { category?: string; q?: string };
-}) {
-  const category = CATEGORIES.find((c) => c.value === searchParams.category)?.value as Category | undefined;
-  const q = searchParams.q?.trim();
+export default async function CataloguePage({ searchParams }: Props) {
+  const cat = searchParams?.categorie ?? "";
+  const sort = searchParams?.sort ?? "";
+  const q = searchParams?.q ?? "";
+  const page = parseInt(searchParams?.page ?? "1", 10);
+  const limit = 20;
 
-  const products = await prisma.product.findMany({
-    where: {
-      isActive: true,
-      ...(category ? { category } : {}),
-      ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
-    },
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      price: true,
-      stockQty: true,
-      unit: true,
-      imageUrl: true,
-      category: true,
-    },
-  });
+  const where: Record<string, unknown> = { actif: true };
+  if (cat) where.categorie = cat;
+  if (q) where.OR = [
+    { nom: { contains: q, mode: "insensitive" } },
+    { marque: { contains: q, mode: "insensitive" } },
+  ];
 
-  const activeCategory = CATEGORIES.find((c) => c.value === category);
+  const orderBy =
+    sort === "prix_asc"   ? { prix: "asc" as const }
+    : sort === "prix_desc"  ? { prix: "desc" as const }
+    : sort === "nouveautes" ? { createdAt: "desc" as const }
+    : { featured: "desc" as const };
+
+  const [total, chaussures] = await Promise.all([
+    prisma.chaussure.count({ where }),
+    prisma.chaussure.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
+      select: {
+        id: true, nom: true, marque: true, categorie: true, couleur: true,
+        prix: true, prixPromo: true, images: true, pointuresDisponibles: true, featured: true,
+      },
+    }),
+  ]);
+
+  const totalPages = Math.ceil(total / limit);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <h1 className="text-3xl font-display font-bold mb-1" style={{ color: "var(--ccb-green)" }}>
-        Catalogue
-      </h1>
-      <p className="text-gray-500 mb-8">
-        {products.length} produit{products.length !== 1 ? "s" : ""}
-        {activeCategory ? ` — ${activeCategory.label}` : ""}
-        {q ? ` — "${q}"` : ""}
-      </p>
+      {/* Breadcrumb */}
+      <nav className="text-xs text-gray-400 mb-6">
+        <Link href="/" className="hover:text-[#C4956A]">Accueil</Link>
+        <span className="mx-2">›</span>
+        <span>Boutique</span>
+      </nav>
 
-      {/* Barre de recherche + filtres catégorie */}
-      <div className="flex flex-col gap-4 mb-8">
-        <SearchInput defaultValue={q ?? ""} category={category} />
-        <div className="flex flex-wrap gap-2">
-          <a
-            href={q ? `/catalogue?q=${q}` : "/catalogue"}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              !category ? "text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+      <h1 className="section-title mb-2">Boutique</h1>
+      <p className="section-subtitle">{total} article{total > 1 ? "s" : ""} disponible{total > 1 ? "s" : ""}</p>
+
+      {/* ── Filtres catégorie ──────────────────────── */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {CATEGORIES.map((c) => (
+          <Link
+            key={c.slug}
+            href={`/catalogue${c.slug ? `?categorie=${c.slug}` : ""}`}
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border transition-colors ${
+              cat === c.slug
+                ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
+                : "border-gray-200 text-[#1A1A1A] hover:border-[#1A1A1A]"
             }`}
-            style={!category ? { backgroundColor: "var(--ccb-green)" } : {}}
           >
-            Tous
-          </a>
-          {CATEGORIES.map((cat) => {
-            const href = `/catalogue?category=${cat.value}${q ? `&q=${q}` : ""}`;
-            const isActive = category === cat.value;
-            return (
-              <a
-                key={cat.value}
-                href={href}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  isActive ? "text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-                style={isActive ? { backgroundColor: "var(--ccb-gold)" } : {}}
-              >
-                {cat.label}
-              </a>
-            );
-          })}
+            {c.label}
+          </Link>
+        ))}
+      </div>
+
+      {/* ── Tri ──────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-8">
+        <span className="text-xs text-gray-400">{total} résultat{total > 1 ? "s" : ""}</span>
+        <div className="flex gap-2">
+          {[
+            { label: "Sélection", val: "" },
+            { label: "Nouveautés", val: "nouveautes" },
+            { label: "Prix ↑", val: "prix_asc" },
+            { label: "Prix ↓", val: "prix_desc" },
+          ].map((o) => (
+            <Link
+              key={o.val}
+              href={`/catalogue?${cat ? `categorie=${cat}&` : ""}sort=${o.val}`}
+              className={`text-xs px-3 py-1.5 border transition-colors ${
+                sort === o.val ? "bg-[#1A1A1A] text-white border-[#1A1A1A]" : "border-gray-200 hover:border-[#1A1A1A]"
+              }`}
+            >
+              {o.label}
+            </Link>
+          ))}
         </div>
       </div>
 
-      {products.length === 0 ? (
-        <div className="text-center py-24 text-gray-400">
-          <p className="text-5xl mb-4">🔍</p>
-          <p className="text-lg font-medium">Aucun produit trouvé</p>
-          <a href="/catalogue" className="mt-4 inline-block text-sm text-ccb-green-600 underline">
-            Voir tout le catalogue
-          </a>
+      {/* ── Grille produits ──────────────────────── */}
+      {chaussures.length === 0 ? (
+        <div className="text-center py-20 text-gray-400">
+          <span className="text-6xl block mb-4">👠</span>
+          <p>Aucun article trouvé pour cette sélection.</p>
+          <Link href="/catalogue" className="btn-noir mt-4 inline-flex">Voir tout le catalogue</Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {products.map((p) => (
-            <ProductCard
-              key={p.id}
-              id={p.id}
-              name={p.name}
-              slug={p.slug}
-              price={p.price}
-              stockQty={p.stockQty}
-              unit={p.unit}
-              imageUrl={p.imageUrl}
-              category={p.category}
-            />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {chaussures.map((ch) => (
+            <Link key={ch.id} href={`/catalogue/${ch.id}`} className="group block">
+              <div className="relative overflow-hidden bg-[#F5F5F5] aspect-square mb-3">
+                {ch.prixPromo && <span className="badge-promo">Promo</span>}
+                {(ch.images as string[])?.[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={(ch.images as string[])[0]}
+                    alt={ch.nom}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-5xl text-gray-200">👠</div>
+                )}
+              </div>
+              {ch.marque && (
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[#9CA3AF]">{ch.marque}</p>
+              )}
+              <p className="font-semibold text-[#1A1A1A] text-sm line-clamp-2 mt-0.5">{ch.nom}</p>
+              {ch.couleur && <p className="text-xs text-gray-400">{ch.couleur}</p>}
+              <div className="flex items-baseline gap-2 mt-1">
+                {ch.prixPromo ? (
+                  <>
+                    <span className="font-bold text-[#C4956A]">{Number(ch.prixPromo).toLocaleString("fr-FR")} FCFA</span>
+                    <span className="text-xs text-gray-400 line-through">{Number(ch.prix).toLocaleString("fr-FR")}</span>
+                  </>
+                ) : (
+                  <span className="font-bold">{Number(ch.prix).toLocaleString("fr-FR")} FCFA</span>
+                )}
+              </div>
+              {(ch.pointuresDisponibles as string[])?.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {(ch.pointuresDisponibles as string[]).slice(0, 5).map((p) => (
+                    <span key={p} className="text-[9px] border border-gray-200 px-1.5 py-0.5 text-gray-500">{p}</span>
+                  ))}
+                </div>
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* ── Pagination ───────────────────────────── */}
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-2 mt-12">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <Link
+              key={p}
+              href={`/catalogue?${cat ? `categorie=${cat}&` : ""}${sort ? `sort=${sort}&` : ""}page=${p}`}
+              className={`w-10 h-10 flex items-center justify-center text-sm font-semibold border transition-colors ${
+                p === page ? "bg-[#1A1A1A] text-white border-[#1A1A1A]" : "border-gray-200 hover:border-[#1A1A1A]"
+              }`}
+            >
+              {p}
+            </Link>
           ))}
         </div>
       )}

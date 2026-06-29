@@ -2,55 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap');
 
 :root {
-  --ccb-green:       #1D5BB0;
-  --ccb-gold:        #F47551;
-  --ccb-green-light: #15428A;
-  --ccb-gold-light:  #E05A37;
-  --ccb-text:        #2D2D2D;
+  --mts-noir:    #1A1A1A;
+  --mts-blanc:   #FFFFFF;
+  --mts-or:      #C4956A;
+  --mts-or-dark: #A87B52;
+  --mts-gris:    #F5F5F5;
+  --mts-gris-2:  #E8E8E8;
+  --mts-gris-3:  #9CA3AF;
+  --mts-wa:      #25D366;
 }
 
 @layer base {
+  * { box-sizing: border-box; }
   body {
     @apply bg-white antialiased;
-    color: var(--ccb-text);
+    color: var(--mts-noir);
     font-family: 'Inter', system-ui, sans-serif;
   }
-
-  h1, h2, h3 {
-    font-family: 'Playfair Display', Georgia, serif;
+  h1, h2, h3, h4 {
+    font-family: 'Montserrat', system-ui, sans-serif;
+    font-weight: 700;
   }
 }
 
 @layer components {
-  .btn-primary {
-    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200;
-    background-color: var(--ccb-green);
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-semibold
+           text-sm tracking-wide uppercase transition-all duration-200 px-6 py-3;
   }
-  .btn-primary:hover {
-    background-color: var(--ccb-green-light);
-    @apply shadow-lg -translate-y-0.5;
+  .btn-noir   { @apply btn bg-[#1A1A1A] text-white hover:bg-[#333333]; }
+  .btn-or     { @apply btn bg-[#C4956A] text-white hover:bg-[#A87B52]; }
+  .btn-wa     { @apply btn text-white bg-[#25D366] hover:bg-[#1da851]; }
+  .btn-outline { @apply btn border-2 border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white; }
+
+  .input {
+    @apply w-full px-4 py-3 border border-gray-200 text-sm focus:outline-none
+           focus:border-[#1A1A1A] transition-colors;
   }
 
-  .btn-gold {
-    @apply inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200;
-    background-color: var(--ccb-gold);
-  }
-  .btn-gold:hover {
-    background-color: var(--ccb-gold-light);
-    @apply shadow-lg -translate-y-0.5;
-  }
+  .badge        { @apply absolute top-2 left-2 z-10 text-[10px] font-bold uppercase tracking-widest px-2 py-1; }
+  .badge-new    { @apply badge bg-[#1A1A1A] text-white; }
+  .badge-promo  { @apply badge bg-[#C4956A] text-white; }
 
-  .card {
-    @apply bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200;
-  }
+  .badge-status-pre-confirmee  { @apply bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-1 rounded; }
+  .badge-status-paye           { @apply bg-blue-100   text-blue-800   text-xs font-semibold px-2 py-1 rounded; }
+  .badge-status-en-preparation { @apply bg-purple-100 text-purple-800 text-xs font-semibold px-2 py-1 rounded; }
+  .badge-status-en-livraison   { @apply bg-orange-100 text-orange-800 text-xs font-semibold px-2 py-1 rounded; }
+  .badge-status-livree         { @apply bg-green-100  text-green-800  text-xs font-semibold px-2 py-1 rounded; }
+  .badge-status-expiree        { @apply bg-gray-100   text-gray-600   text-xs font-semibold px-2 py-1 rounded; }
+  .badge-status-annulee        { @apply bg-red-100    text-red-800    text-xs font-semibold px-2 py-1 rounded; }
 
-  .badge-status-pre-confirmed  { @apply bg-yellow-100 text-yellow-800; }
-  .badge-status-confirmed       { @apply bg-blue-100 text-blue-800; }
-  .badge-status-in-preparation { @apply bg-purple-100 text-purple-800; }
-  .badge-status-in-delivery    { @apply bg-orange-100 text-orange-800; }
-  .badge-status-delivered      { @apply bg-green-100 text-green-800; }
-  .badge-status-cancelled      { @apply bg-red-100 text-red-800; }
+  .section-title    { @apply text-2xl md:text-3xl font-display font-black uppercase tracking-tight text-[#1A1A1A] mb-1; }
+  .section-subtitle { @apply text-sm text-[#9CA3AF] mb-8; }
+}
+
+@layer utilities {
+  .animate-marquee { animation: marquee 30s linear infinite; }
+}
+
+@keyframes marquee {
+  0%   { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
 }

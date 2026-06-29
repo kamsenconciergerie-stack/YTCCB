@@ -6,7 +6,7 @@ import {
   addToCart,
   updateQty,
   removeFromCart,
-  clearCart,
+  clearCart as libClearCart,
   cartTotal,
   cartCount,
 } from "@/lib/cart";
@@ -16,9 +16,9 @@ interface CartContextType {
   count: number;
   total: number;
   add: (item: CartItem) => void;
-  setQty: (productId: string, quantity: number) => void;
-  remove: (productId: string) => void;
-  clear: () => void;
+  setQty: (productId: string, quantity: number, pointure?: string) => void;
+  remove: (productId: string, pointure?: string) => void;
+  clearCart: () => void;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -26,31 +26,19 @@ const CartContext = createContext<CartContextType | null>(null);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
 
-  useEffect(() => {
-    setItems(getCart());
-  }, []);
+  useEffect(() => { setItems(getCart()); }, []);
 
-  const add = useCallback((item: CartItem) => {
-    setItems(addToCart(item));
+  const add = useCallback((item: CartItem) => { setItems(addToCart(item)); }, []);
+  const setQty = useCallback((productId: string, quantity: number, pointure?: string) => {
+    setItems(updateQty(productId, quantity, pointure));
   }, []);
-
-  const setQty = useCallback((productId: string, quantity: number) => {
-    setItems(updateQty(productId, quantity));
+  const remove = useCallback((productId: string, pointure?: string) => {
+    setItems(removeFromCart(productId, pointure));
   }, []);
-
-  const remove = useCallback((productId: string) => {
-    setItems(removeFromCart(productId));
-  }, []);
-
-  const clear = useCallback(() => {
-    clearCart();
-    setItems([]);
-  }, []);
+  const clearCart = useCallback(() => { libClearCart(); setItems([]); }, []);
 
   return (
-    <CartContext.Provider
-      value={{ items, count: cartCount(items), total: cartTotal(items), add, setQty, remove, clear }}
-    >
+    <CartContext.Provider value={{ items, count: cartCount(items), total: cartTotal(items), add, setQty, remove, clearCart }}>
       {children}
     </CartContext.Provider>
   );

@@ -1,39 +1,38 @@
 import { prisma } from "./prisma";
 
 /**
- * Génère un numéro de commande lisible : CCB-YYYYMM-NNNN
- * Le compteur repart à 1 chaque mois.
+ * Génère un numéro de commande lisible : MTS-YYYYMMDD-XXXX
+ * Le compteur repart à 1 chaque jour.
  */
 export async function generateOrderNumber(): Promise<string> {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  const dateStr = `${y}${m}${d}`;
 
-  const startOfMonth = new Date(year, now.getMonth(), 1);
+  const startOfDay = new Date(y, now.getMonth(), now.getDate());
   const count = await prisma.order.count({
-    where: { createdAt: { gte: startOfMonth } },
+    where: { createdAt: { gte: startOfDay } },
   });
 
   const seq = String(count + 1).padStart(4, "0");
-  return `CCB-${year}${month}-${seq}`;
+  return `MTS-${dateStr}-${seq}`;
+}
+
+/**
+ * Calcule la date d'expiration d'une commande (30 min après création).
+ */
+export function orderExpiresAt(): Date {
+  return new Date(Date.now() + 30 * 60 * 1000);
 }
 
 /**
  * Normalise un numéro WhatsApp sénégalais au format +221XXXXXXXXX
- * Gère les cas : "0033...", "33...", "221...", "7X XXX XX XX"
  */
 export function normalizeWhatsAppNumber(raw: string): string {
   const digits = raw.replace(/\D/g, "");
-
-  // Déjà avec indicatif international complet
-  if (digits.startsWith("221") && digits.length === 12) {
-    return `+${digits}`;
-  }
-  // Numéro local 9 chiffres commençant par 7
-  if (digits.length === 9 && digits.startsWith("7")) {
-    return `+221${digits}`;
-  }
-
-  // Retourner tel quel avec + si non reconnu (laisser la validation Zod gérer)
+  if (digits.startsWith("221") && digits.length === 12) return `+${digits}`;
+  if (digits.length === 9 && digits.startsWith("7")) return `+221${digits}`;
   return digits.startsWith("+") ? raw.trim() : `+${digits}`;
 }

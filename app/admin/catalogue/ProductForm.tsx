@@ -3,14 +3,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 const CATEGORIES = [
-  { value: "GROS_OEUVRE", label: "Gros œuvre" },
-  { value: "ETANCHEITE", label: "Étanchéité" },
-  { value: "CARRELAGE", label: "Carrelage" },
-  { value: "PLOMBERIE", label: "Plomberie" },
-  { value: "ELECTRICITE", label: "Électricité" },
-  { value: "SANITAIRES", label: "Sanitaires" },
-  { value: "ELECTROMENAGER", label: "Électroménager" },
-  { value: "SOLAIRE", label: "Solaire" },
+  { value: "ESCARPINS",  label: "Escarpins" },
+  { value: "SANDALES",   label: "Sandales" },
+  { value: "BOTTES",     label: "Bottes & Bottines" },
+  { value: "MULES",      label: "Mules & Sabots" },
+  { value: "BALLERINES", label: "Ballerines" },
+  { value: "BASKETS",    label: "Baskets & Sneakers" },
+  { value: "MOCASSINS",  label: "Mocassins & Loafers" },
+  { value: "COMPENSEES", label: "Compensées & Plateformes" },
 ];
 
 interface ProductData {
@@ -36,7 +36,7 @@ export function ProductForm({ initial }: { initial?: ProductData }) {
 
   const [form, setForm] = useState<ProductData>({
     name: initial?.name ?? "",
-    category: initial?.category ?? "GROS_OEUVRE",
+    category: initial?.category ?? "ESCARPINS",
     price: initial?.price ?? 0,
     stockQty: initial?.stockQty ?? 0,
     lowStockThreshold: initial?.lowStockThreshold ?? 5,
@@ -71,14 +71,14 @@ export function ProductForm({ initial }: { initial?: ProductData }) {
     finally { setLoading(false); }
   }
 
-  const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ccb-green-600/40";
+  const inputCls = "w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-mts-primary-600/40";
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl space-y-5">
       <div className="card p-6 space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Nom du produit *</label>
-          <input type="text" required value={form.name} onChange={(e) => set("name", e.target.value)} className={inputCls} placeholder="ex : Ciment Portland 50kg" />
+          <input type="text" required value={form.name} onChange={(e) => set("name", e.target.value)} className={inputCls} placeholder="ex : Escarpins noirs talon 7cm" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -89,7 +89,7 @@ export function ProductForm({ initial }: { initial?: ProductData }) {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Unité</label>
-            <input type="text" value={form.unit} onChange={(e) => set("unit", e.target.value)} className={inputCls} placeholder="unité, sac, m², kg..." />
+            <input type="text" value={form.unit} onChange={(e) => set("unit", e.target.value)} className={inputCls} placeholder="paire, unité..." />
           </div>
         </div>
         <div className="grid grid-cols-3 gap-4">

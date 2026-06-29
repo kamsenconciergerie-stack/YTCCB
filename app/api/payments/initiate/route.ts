@@ -4,7 +4,6 @@ import { verifyApiKey } from "@/lib/api-key";
 import { InitiatePaymentSchema } from "@/lib/validators/payment";
 import { createWaveCheckout } from "@/lib/payment/wave";
 import { initiateOrangeMoneyPayment } from "@/lib/payment/orange-money";
-import { randomUUID } from "crypto";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
@@ -14,59 +13,48 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Corps JSON invalide" }, { status: 400 });
-  }
+  try { body = await request.json(); }
+  catch { return NextResponse.json({ error: "Corps JSON invalide" }, { status: 400 }); }
 
   const parsed = InitiatePaymentSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Données invalides", details: parsed.error.flatten() },
-      { status: 422 }
-    );
+    return NextResponse.json({ error: "Données invalides", details: parsed.error.flatten() }, { status: 422 });
   }
 
   const { orderId, provider, returnUrl, cancelUrl } = parsed.data;
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, orderNumber: true, total: true, status: true },
+    select: { id: true, numeroCommande: true, total: true, status: true },
   });
 
-  if (!order) {
-    return NextResponse.json({ error: "Commande introuvable" }, { status: 404 });
-  }
-
-  if (order.status === "CANCELLED") {
-    return NextResponse.json({ error: "Commande annulée — paiement impossible" }, { status: 422 });
-  }
-
-  if (provider === "ON_DELIVERY") {
-    const payment = await prisma.payment.create({
-      data: {
-        orderId,
-        provider: "ON_DELIVERY",
-        status: "PENDING",
-        amount: order.total,
-        idempotencyKey: `on_delivery_${orderId}_${randomUUID()}`,
-      },
-    });
-    return NextResponse.json({ data: { provider: "ON_DELIVERY", paymentId: payment.id } });
-  }
+  if (!order) return NextResponse.json({ error: "Commande introuvable" }, { status: 404 });
+  if (order.status === "ANNULEE") return NextResponse.json({ error: "Commande annulée — paiement impossible" }, { status: 422 });
+  if (order.status === "EXPIREE") return NextResponse.json({ error: "Commande expirée — paiement impossible" }, { status: 422 });
 
   const amount = Number(order.total);
   const successUrl = returnUrl ?? `${APP_URL}/commande/${orderId}/confirmation`;
-  const errorUrl   = cancelUrl ?? `${APP_URL}/commande/${orderId}/echec`;
+  const errorUrl = cancelUrl ?? `${APP_URL}/commande/${orderId}/echec`;
   const idempotencyKey = `${provider.toLowerCase()}_${orderId}_${Date.now()}`;
+
+  if (provider === "A_LA_LIVRAISON") {
+    const payment = await prisma.payment.create({
+      data: {
+        orderId,
+        provider: "A_LA_LIVRAISON",
+        amount: order.total,
+        idempotencyKey,
+      },
+    });
+    return NextResponse.json({ data: { provider: "A_LA_LIVRAISON", paymentId: payment.id } });
+  }
 
   try {
     if (provider === "WAVE") {
       const session = await createWaveCheckout({
         amount,
         orderId,
-        orderNumber: order.orderNumber,
+        orderNumber: order.numeroCommande,
         successUrl,
         errorUrl,
       });
@@ -75,7 +63,6 @@ export async function POST(request: NextRequest) {
         data: {
           orderId,
           provider: "WAVE",
-          status: "PENDING",
           amount: order.total,
           providerPaymentId: session.id,
           paymentLink: session.wave_launch_url,
@@ -83,13 +70,13 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return NextResponse.json({
-        data: {
-          provider: "WAVE",
-          paymentUrl: session.wave_launch_url,
-          sessionId: session.id,
-        },
+      // Stocker le lien Wave sur la commande pour affichage côté client
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { lienPaiementWave: session.wave_launch_url },
       });
+
+      return NextResponse.json({ data: { provider: "WAVE", paymentUrl: session.wave_launch_url, sessionId: session.id } });
     }
 
     if (provider === "ORANGE_MONEY") {
@@ -97,7 +84,7 @@ export async function POST(request: NextRequest) {
       const result = await initiateOrangeMoneyPayment({
         amount,
         orderId,
-        orderNumber: order.orderNumber,
+        orderNumber: order.numeroCommande,
         returnUrl: successUrl,
         cancelUrl: errorUrl,
         notifUrl,
@@ -107,23 +94,15 @@ export async function POST(request: NextRequest) {
         data: {
           orderId,
           provider: "ORANGE_MONEY",
-          status: "PENDING",
           amount: order.total,
           providerPaymentId: result.pay_token,
           paymentLink: result.payment_url,
-          // Stocker le notif_token pour vérification webhook
           transactionRef: result.notif_token,
           idempotencyKey,
         },
       });
 
-      return NextResponse.json({
-        data: {
-          provider: "ORANGE_MONEY",
-          paymentUrl: result.payment_url,
-          payToken: result.pay_token,
-        },
-      });
+      return NextResponse.json({ data: { provider: "ORANGE_MONEY", paymentUrl: result.payment_url, payToken: result.pay_token } });
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur paiement inconnue";

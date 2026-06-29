@@ -54,8 +54,8 @@ function LoginForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all"
-          style={{ "--tw-ring-color": "var(--ccb-green)" } as React.CSSProperties}
-          placeholder="admin@ccbmateriaux.com"
+          style={{ "--tw-ring-color": "var(--mts-primary)" } as React.CSSProperties}
+          placeholder="admin@mortalla.com"
         />
       </div>
 
@@ -95,13 +95,13 @@ export default function LoginPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/logo.png"
-            alt="CCB Matériaux"
+            alt="Mor Talla Sandaga"
             className="h-16 w-auto mx-auto mb-4 object-contain"
           />
           <h1 className="text-xl font-display font-semibold text-gray-900">
             Espace administration
           </h1>
-          <p className="text-sm text-gray-500 mt-1">CCB Matériaux</p>
+          <p className="text-sm text-gray-500 mt-1">Mor Talla Sandaga</p>
         </div>
 
         <div className="card p-6">

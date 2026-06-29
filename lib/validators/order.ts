@@ -1,43 +1,42 @@
 import { z } from "zod";
 
-export const OrderChannelSchema = z.enum(["WHATSAPP", "WEB", "MANUAL", "PHONE"]);
-
 export const OrderStatusSchema = z.enum([
-  "PRE_CONFIRMED",
-  "CONFIRMED",
-  "IN_PREPARATION",
-  "IN_DELIVERY",
-  "DELIVERED",
-  "CANCELLED",
+  "PRE_CONFIRMEE",
+  "PAYE",
+  "EN_PREPARATION",
+  "EN_LIVRAISON",
+  "LIVREE",
+  "EXPIREE",
+  "ANNULEE",
 ]);
 
 export const OrderItemInputSchema = z.object({
-  productId: z.string().min(1),
+  chaussureId: z.string().uuid(),
   quantity: z.number().int().positive(),
+  pointure: z.string().max(10).optional(),
+  couleur: z.string().max(100).optional(),
 });
 
 export const CreateOrderSchema = z.object({
-  // WhatsApp number du client — normalisé côté serveur
-  customerWhatsapp: z
-    .string()
-    .regex(/^\+?[0-9]{9,15}$/, "Format de numéro WhatsApp invalide"),
-  customerName: z.string().min(1).max(100).optional(),
-  channel: OrderChannelSchema,
-  items: z.array(OrderItemInputSchema).min(1, "La commande doit contenir au moins un produit"),
-  deliveryZoneId: z.string().min(1).optional(),
-  deliveryAddress: z.string().max(500).optional(),
-  deliveryCity: z.string().max(100).optional(),
-  notes: z.string().max(1000).optional(),
+  customerName: z.string().min(1).max(200),
+  customerWhatsapp: z.string().regex(/^\+?[0-9]{9,15}$/, "Numéro invalide"),
+  deliveryAddress: z.string().min(5).max(500),
+  deliveryCity: z.string().min(1).max(100),
+  deliveryZoneId: z.string().uuid(),
+  canalFinalisation: z.enum(["WEB", "WHATSAPP"]),
+  items: z.array(OrderItemInputSchema).min(1, "Le panier est vide"),
+  notes: z.string().max(500).optional(),
 });
 
 export const UpdateOrderStatusSchema = z.object({
   status: OrderStatusSchema,
   cancelReason: z.string().max(500).optional(),
+  livreurId: z.string().uuid().optional(),
 });
 
 export const OrderFiltersSchema = z.object({
   status: OrderStatusSchema.optional(),
-  channel: OrderChannelSchema.optional(),
+  canal: z.enum(["WEB", "WHATSAPP"]).optional(),
   customerId: z.string().uuid().optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),

@@ -1,0 +1,65 @@
+{
+  "name": "MTS - 1. Notification nouvelle commande",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mts-nouvelle-commande",
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-nouvelle-commande",
+      "name": "Webhook Nouvelle Commande",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "mts-nouvelle-commande"
+    },
+    {
+      "parameters": {
+        "jsCode": "const order = $input.first().json.body || $input.first().json;\nconst items = (order.items || []).map(i => `• ${i.chaussureNom} x${i.quantity}${i.pointure ? ' (P'+i.pointure+')' : ''}`).join('\\n');\nconst canal = order.canalFinalisation === 'WHATSAPP' ? '💬 WhatsApp' : '🌐 Web';\nreturn [{\n  json: {\n    ...order,\n    items_text: items,\n    canal_label: canal,\n    total_fmt: Number(order.total || 0).toLocaleString('fr-FR') + ' FCFA'\n  }\n}];"
+      },
+      "id": "format-commande",
+      "name": "Formater commande",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sessionId": "={{$env.WHATSAPP_PHONE_NUMBER_ID}}",
+        "remoteJid": "={{$env.WHATSAPP_ADMIN_NUMBER}}",
+        "messageType": "text",
+        "message": "🛍️ *Nouvelle commande MTS !*\n\n📋 *{{$json.numeroCommande}}*\n👤 Client : {{$json.customerName}}\n📱 {{$json.customerWhatsapp}}\n{{$json.canal_label}}\n\n*Articles :*\n{{$json.items_text}}\n\n💰 Total : *{{$json.total_fmt}}*\n🏙️ Ville : {{$json.deliveryCity}}\n📍 Adresse : {{$json.deliveryAddress}}"
+      },
+      "id": "whatsapp-admin",
+      "name": "Notifier Admin WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [720, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"received\": true }"
+      },
+      "id": "respond",
+      "name": "Répondre 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [720, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Nouvelle Commande": { "main": [[{ "node": "Formater commande", "type": "main", "index": 0 }]] },
+    "Formater commande": {
+      "main": [[
+        { "node": "Notifier Admin WhatsApp", "type": "main", "index": 0 },
+        { "node": "Répondre 200", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "active": true,
+  "tags": ["MTS", "commandes", "whatsapp"]
+}

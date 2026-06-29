@@ -3,76 +3,101 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 const STATUS_LABELS: Record<string, string> = {
-  PRE_CONFIRMED: "Pré-confirmée", CONFIRMED: "Confirmée",
-  IN_PREPARATION: "En préparation", IN_DELIVERY: "En livraison",
-  DELIVERED: "Livrée", CANCELLED: "Annulée",
+  PRE_CONFIRMEE: "Pré-confirmée", PAYE: "Payée",
+  EN_PREPARATION: "En préparation", EN_LIVRAISON: "En livraison",
+  LIVREE: "Livrée", EXPIREE: "Expirée", ANNULEE: "Annulée",
 };
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  PRE_CONFIRMED: ["CONFIRMED", "CANCELLED"],
-  CONFIRMED: ["IN_PREPARATION", "CANCELLED"],
-  IN_PREPARATION: ["IN_DELIVERY", "CANCELLED"],
-  IN_DELIVERY: ["DELIVERED", "CANCELLED"],
-  DELIVERED: [], CANCELLED: [],
+  PRE_CONFIRMEE:  ["PAYE", "ANNULEE"],
+  PAYE:           ["EN_PREPARATION", "ANNULEE"],
+  EN_PREPARATION: ["EN_LIVRAISON", "ANNULEE"],
+  EN_LIVRAISON:   ["LIVREE", "ANNULEE"],
+  LIVREE: [], EXPIREE: [], ANNULEE: [],
 };
 
-const TRANSITION_LABELS: Record<string, string> = {
-  CONFIRMED: "✓ Confirmer", IN_PREPARATION: "▶ Mettre en préparation",
-  IN_DELIVERY: "🚚 Mettre en livraison", DELIVERED: "✓ Marquer livrée",
-  CANCELLED: "✕ Annuler",
-};
+type Livreur = { id: string; nom: string; disponible: boolean };
 
-const TRANSITION_STYLE: Record<string, string> = {
-  CONFIRMED: "bg-blue-600 hover:bg-blue-700 text-white",
-  IN_PREPARATION: "bg-purple-600 hover:bg-purple-700 text-white",
-  IN_DELIVERY: "bg-orange-500 hover:bg-orange-600 text-white",
-  DELIVERED: "bg-green-600 hover:bg-green-700 text-white",
-  CANCELLED: "bg-red-100 hover:bg-red-200 text-red-700",
-};
-
-export function StatusChanger({ orderId, currentStatus }: { orderId: string; currentStatus: string }) {
+export function StatusChanger({
+  orderId,
+  currentStatus,
+  livreurs = [],
+}: {
+  orderId: string;
+  currentStatus: string;
+  livreurs?: Livreur[];
+}) {
   const router = useRouter();
-  const [loading, setLoading] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+  const [livreurId, setLivreurId] = useState("");
 
-  const transitions = ALLOWED_TRANSITIONS[currentStatus] ?? [];
+  const allowed = ALLOWED_TRANSITIONS[currentStatus] ?? [];
 
-  async function changeStatus(newStatus: string) {
-    setLoading(newStatus);
-    setError("");
+  async function handleChange(newStatus: string) {
+    setLoading(true); setError("");
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({
+          status: newStatus,
+          ...(cancelReason ? { cancelReason } : {}),
+          ...(livreurId ? { livreurId } : {}),
+        }),
       });
-      if (!res.ok) { const j = await res.json(); setError(j.error ?? "Erreur"); return; }
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Erreur"); return; }
       router.refresh();
-    } catch {
-      setError("Erreur réseau");
-    } finally {
-      setLoading(null);
-    }
+    } catch { setError("Erreur réseau"); }
+    finally { setLoading(false); }
   }
 
-  if (transitions.length === 0) return null;
+  if (allowed.length === 0) return null;
 
   return (
-    <div className="card p-5">
-      <h3 className="font-semibold text-gray-800 mb-3 text-sm">Changer le statut</h3>
-      {error && <p className="text-red-600 text-xs mb-3">{error}</p>}
+    <div className="border-t border-gray-100 pt-4 mt-4">
+      <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Changer le statut</p>
+
+      {allowed.includes("EN_LIVRAISON") && livreurs.length > 0 && (
+        <div className="mb-3">
+          <label className="text-xs font-semibold mb-1 block">Assigner un livreur</label>
+          <select className="input text-sm bg-white max-w-xs" value={livreurId} onChange={(e) => setLivreurId(e.target.value)}>
+            <option value="">Sélectionner…</option>
+            {livreurs.filter((l) => l.disponible).map((l) => (
+              <option key={l.id} value={l.id}>{l.nom}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {allowed.includes("ANNULEE") && (
+        <input
+          className="input text-sm mb-3 max-w-sm"
+          placeholder="Raison d'annulation (si annulée)"
+          value={cancelReason}
+          onChange={(e) => setCancelReason(e.target.value)}
+        />
+      )}
+
       <div className="flex flex-wrap gap-2">
-        {transitions.map((t) => (
+        {allowed.map((s) => (
           <button
-            key={t}
-            onClick={() => changeStatus(t)}
-            disabled={loading !== null}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${TRANSITION_STYLE[t] ?? "bg-gray-100 text-gray-700"}`}
+            key={s}
+            disabled={loading}
+            onClick={() => handleChange(s)}
+            className={`text-xs px-4 py-2 font-semibold transition-colors disabled:opacity-50 border ${
+              s === "ANNULEE"
+                ? "border-red-300 text-red-600 hover:bg-red-50"
+                : "border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white"
+            }`}
           >
-            {loading === t ? "..." : TRANSITION_LABELS[t] ?? STATUS_LABELS[t]}
+            {loading ? "…" : `→ ${STATUS_LABELS[s] ?? s}`}
           </button>
         ))}
       </div>
+      {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
     </div>
   );
 }

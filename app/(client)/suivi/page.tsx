@@ -1,181 +1,181 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { formatPrice, formatDate } from "@/lib/format";
-import { Suspense } from "react";
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  PRE_CONFIRMED:  { label: "En attente de confirmation", color: "bg-yellow-100 text-yellow-800" },
-  CONFIRMED:      { label: "Confirmée",                  color: "bg-blue-100 text-blue-800" },
-  IN_PREPARATION: { label: "En préparation",             color: "bg-purple-100 text-purple-800" },
-  IN_DELIVERY:    { label: "En livraison",               color: "bg-orange-100 text-orange-800" },
-  DELIVERED:      { label: "Livrée",                     color: "bg-green-100 text-green-800" },
-  CANCELLED:      { label: "Annulée",                    color: "bg-red-100 text-red-800" },
+const STATUS_LABELS: Record<string, string> = {
+  PRE_CONFIRMEE:  "Commande reçue",
+  PAYE:           "Paiement confirmé",
+  EN_PREPARATION: "En préparation",
+  EN_LIVRAISON:   "En livraison",
+  LIVREE:         "Livrée ✅",
+  EXPIREE:        "Expirée",
+  ANNULEE:        "Annulée",
 };
 
-const PAYMENT_LABELS: Record<string, string> = {
-  WAVE: "Wave",
-  ORANGE_MONEY: "Orange Money",
-  ON_DELIVERY: "À la livraison",
-};
+const STATUS_ORDER = ["PRE_CONFIRMEE", "PAYE", "EN_PREPARATION", "EN_LIVRAISON", "LIVREE"];
 
-const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  PENDING: "En attente",
-  COMPLETED: "Payé",
-  FAILED: "Échoué",
-  REFUNDED: "Remboursé",
-  EXPIRED: "Expiré",
-};
-
-interface OrderData {
-  orderNumber: string;
+type Order = {
+  numeroCommande: string;
   status: string;
-  subtotal: string;
-  deliveryFee: string;
-  total: string;
-  deliveryZone?: { name: string };
-  deliveryAddress?: string;
+  statutPaiement: string;
+  canalFinalisation: string;
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
   deliveryCity?: string;
-  createdAt: string;
+  paidAt?: string;
   deliveredAt?: string;
-  items: { productName: string; quantity: number; unitPrice: string; totalPrice: string; unit: string }[];
-  payments: { provider: string; status: string }[];
-}
+  createdAt: string;
+  expiresAt?: string;
+  deliveryZone?: { name: string };
+  livreur?: { nom: string; telephone: string };
+  items: {
+    chaussureNom: string;
+    chaussureRef: string;
+    quantity: number;
+    pointure?: string;
+    couleur?: string;
+    unitPrice: number;
+    totalPrice: number;
+  }[];
+};
 
 function SuiviContent() {
-  const searchParams = useSearchParams();
-  const [orderNumber, setOrderNumber] = useState(searchParams.get("orderNumber") ?? "");
-  const [order, setOrder] = useState<OrderData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const params = useSearchParams();
+  const [num, setNum] = useState(params.get("num") ?? "");
+  const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const num = searchParams.get("orderNumber");
-    if (num) {
-      setOrderNumber(num);
-      fetchOrder(num);
-    }
+    const n = params.get("num");
+    if (n) { setNum(n); void search(n); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function fetchOrder(num: string) {
-    setLoading(true);
-    setError("");
-    setOrder(null);
+  async function search(n?: string) {
+    const q = (n ?? num).trim().toUpperCase();
+    if (!q) return;
+    setLoading(true); setError(""); setOrder(null);
     try {
-      const res = await fetch(`/api/orders/track?orderNumber=${encodeURIComponent(num.trim().toUpperCase())}`);
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Commande introuvable");
-        return;
-      }
-      setOrder(json.data);
-    } catch {
-      setError("Erreur réseau. Veuillez réessayer.");
-    } finally {
-      setLoading(false);
-    }
+      const res = await fetch(`/api/orders/track?num=${q}`);
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Commande introuvable"); return; }
+      setOrder(data.data);
+    } catch { setError("Erreur réseau"); }
+    finally { setLoading(false); }
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    fetchOrder(orderNumber);
-  }
-
-  const statusInfo = order ? STATUS_LABELS[order.status] : null;
+  const currentStep = order ? STATUS_ORDER.indexOf(order.status) : -1;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
-      <h1 className="text-3xl font-display font-bold mb-2" style={{ color: "var(--ccb-green)" }}>
-        Suivre ma commande
-      </h1>
-      <p className="text-gray-500 mb-8">Entrez votre numéro de commande (ex : CCB-202406-0001)</p>
+    <div className="max-w-2xl mx-auto px-4 py-12">
+      <h1 className="text-3xl font-display font-black uppercase mb-2">Suivi de commande</h1>
+      <p className="text-gray-500 text-sm mb-8">Entrez votre numéro de commande (ex : MTS-20260629-0001)</p>
 
-      <form onSubmit={handleSubmit} className="flex gap-3 mb-10">
+      {/* ── Barre de recherche ─── */}
+      <div className="flex gap-2 mb-8">
         <input
-          type="text"
-          value={orderNumber}
-          onChange={(e) => setOrderNumber(e.target.value)}
-          placeholder="CCB-AAAAMM-NNNN"
-          className="flex-1 px-4 py-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-ccb-green-600/40 uppercase"
+          className="input flex-1"
+          placeholder="MTS-AAAAMMJJ-XXXX"
+          value={num}
+          onChange={(e) => setNum(e.target.value.toUpperCase())}
+          onKeyDown={(e) => e.key === "Enter" && search()}
         />
-        <button type="submit" disabled={loading || !orderNumber.trim()} className="btn-primary px-6 py-3 text-sm disabled:opacity-50">
-          {loading ? "..." : "Rechercher"}
+        <button onClick={() => search()} disabled={loading} className="btn-noir px-6">
+          {loading ? "…" : "Rechercher"}
         </button>
-      </form>
+      </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-100 text-red-700 rounded-lg px-5 py-4 mb-6 text-sm">
-          {error}
-        </div>
+        <div className="bg-red-50 border border-red-200 text-red-800 rounded p-4 text-sm mb-6">{error}</div>
       )}
 
-      {order && statusInfo && (
-        <div className="card overflow-hidden">
-          {/* En-tête statut */}
-          <div className="p-5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <p className="text-xs text-gray-400 mb-0.5">Commande</p>
-              <p className="font-bold text-lg" style={{ color: "var(--ccb-green)" }}>{order.orderNumber}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{formatDate(order.createdAt)}</p>
+      {order && (
+        <div className="space-y-6">
+          {/* ── En-tête ────────────────────────────── */}
+          <div className="bg-[#F5F5F5] p-6 rounded">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#C4956A] mb-1">Commande</p>
+                <p className="text-xl font-black">{order.numeroCommande}</p>
+              </div>
+              <span className={`badge-status-${order.status.toLowerCase().replace("_", "-")}`}>
+                {STATUS_LABELS[order.status] ?? order.status}
+              </span>
             </div>
-            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${statusInfo.color}`}>
-              {statusInfo.label}
-            </span>
+            <p className="text-xs text-gray-500">
+              Passée le {new Date(order.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+            </p>
+            {order.livreur && (
+              <p className="text-xs text-gray-500 mt-1">
+                Livreur : <strong>{order.livreur.nom}</strong> — {order.livreur.telephone}
+              </p>
+            )}
           </div>
 
-          {/* Articles */}
-          <div className="p-5 border-b border-gray-100">
-            <h2 className="font-semibold text-sm text-gray-700 mb-3">Articles commandés</h2>
-            <div className="space-y-2">
-              {order.items.map((item, i) => (
-                <div key={i} className="flex justify-between text-sm">
-                  <span className="text-gray-600">
-                    {item.productName} × {item.quantity} {item.unit}
-                  </span>
-                  <span className="font-medium">{formatPrice(item.totalPrice)}</span>
+          {/* ── Timeline ────────────────────────────── */}
+          <div className="flex items-center gap-0">
+            {STATUS_ORDER.map((s, i) => (
+              <div key={s} className="flex-1 flex items-center">
+                <div className={`relative flex flex-col items-center`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
+                    i <= currentStep
+                      ? "bg-[#1A1A1A] border-[#1A1A1A] text-white"
+                      : "bg-white border-gray-200 text-gray-300"
+                  }`}>
+                    {i < currentStep ? "✓" : i + 1}
+                  </div>
+                  <p className="text-[9px] font-semibold uppercase tracking-wide mt-1 text-center max-w-[60px]">
+                    {STATUS_LABELS[s]}
+                  </p>
+                </div>
+                {i < STATUS_ORDER.length - 1 && (
+                  <div className={`flex-1 h-0.5 ${i < currentStep ? "bg-[#1A1A1A]" : "bg-gray-200"}`} />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* ── Articles ────────────────────────────── */}
+          <div>
+            <h2 className="font-bold uppercase tracking-wider text-sm mb-3">Articles</h2>
+            <div className="divide-y divide-gray-100">
+              {order.items.map((it, i) => (
+                <div key={i} className="flex justify-between py-3 text-sm">
+                  <div>
+                    <span className="font-medium">{it.chaussureNom}</span>
+                    {it.pointure && <span className="text-gray-500 ml-1">— Pointure {it.pointure}</span>}
+                    {it.couleur && <span className="text-gray-400 ml-1">({it.couleur})</span>}
+                    <span className="text-gray-400 ml-1">×{it.quantity}</span>
+                  </div>
+                  <span>{Number(it.totalPrice).toLocaleString("fr-FR")} FCFA</span>
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Livraison */}
-          {(order.deliveryZone || order.deliveryAddress) && (
-            <div className="p-5 border-b border-gray-100 text-sm">
-              <h2 className="font-semibold text-gray-700 mb-1">Livraison</h2>
-              {order.deliveryZone && <p className="text-gray-600">{order.deliveryZone.name}</p>}
-              {order.deliveryAddress && <p className="text-gray-500">{order.deliveryAddress}</p>}
-              {order.deliveryCity && <p className="text-gray-500">{order.deliveryCity}</p>}
-            </div>
-          )}
-
-          {/* Paiement */}
-          {order.payments.length > 0 && (
-            <div className="p-5 border-b border-gray-100 text-sm">
-              <h2 className="font-semibold text-gray-700 mb-1">Paiement</h2>
-              <p className="text-gray-600">
-                {PAYMENT_LABELS[order.payments[0].provider] ?? order.payments[0].provider}
-                {" — "}
-                {PAYMENT_STATUS_LABELS[order.payments[0].status] ?? order.payments[0].status}
-              </p>
-            </div>
-          )}
-
-          {/* Total */}
-          <div className="p-5 text-sm space-y-1">
-            <div className="flex justify-between text-gray-500">
-              <span>Sous-total</span>
-              <span>{formatPrice(order.subtotal)}</span>
-            </div>
-            <div className="flex justify-between text-gray-500">
-              <span>Livraison</span>
-              <span>{Number(order.deliveryFee) > 0 ? formatPrice(order.deliveryFee) : "—"}</span>
-            </div>
-            <div className="flex justify-between font-bold text-base pt-1 border-t border-gray-100">
-              <span>Total</span>
-              <span style={{ color: "var(--ccb-green)" }}>{formatPrice(order.total)}</span>
+            <div className="border-t border-gray-200 pt-3 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Sous-total</span>
+                <span>{Number(order.subtotal).toLocaleString("fr-FR")} FCFA</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Livraison {order.deliveryZone ? `(${order.deliveryZone.name})` : ""}</span>
+                <span>{Number(order.deliveryFee).toLocaleString("fr-FR")} FCFA</span>
+              </div>
+              <div className="flex justify-between font-bold text-base pt-2">
+                <span>Total</span>
+                <span className="text-[#C4956A]">{Number(order.total).toLocaleString("fr-FR")} FCFA</span>
+              </div>
             </div>
           </div>
+
+          {/* ── Paiement WA ──────────────────────── */}
+          {order.canalFinalisation === "WHATSAPP" && order.status === "PRE_CONFIRMEE" && (
+            <div className="bg-green-50 border border-green-200 p-4 rounded">
+              <p className="text-sm text-green-800 font-semibold mb-2">Finalisation par WhatsApp</p>
+              <p className="text-xs text-green-700">Notre équipe va vous contacter sur WhatsApp pour confirmer et procéder au paiement.</p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -184,7 +184,7 @@ function SuiviContent() {
 
 export default function SuiviPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="py-20 text-center text-gray-400">Chargement…</div>}>
       <SuiviContent />
     </Suspense>
   );

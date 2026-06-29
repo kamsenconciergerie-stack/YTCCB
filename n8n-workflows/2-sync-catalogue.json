@@ -1,5 +1,5 @@
 {
-  "name": "CCB - Sync Catalogue Produits",
+  "name": "MTS - Sync Catalogue Produits",
   "nodes": [
     {
       "parameters": {
@@ -25,7 +25,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [-1400, 500],
-      "webhookId": "ccb-sync-catalogue-manuel"
+      "webhookId": "mts-sync-catalogue-manuel"
     },
     {
       "parameters": {
@@ -41,7 +41,7 @@
     },
     {
       "parameters": {
-        "url": "https://www.ccbmateriaux.com/sitemap.xml",
+        "url": "https://www.mortalla.com/sitemap.xml",
         "options": {
           "ignoreResponseCode": true,
           "timeout": 15000
@@ -55,7 +55,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// IMPORTANT : ccbmateriaux.com bloque le crawl automatise via robots.txt.\n// Ce workflow est une solution de SECOURS uniquement, a utiliser en attendant\n// un acces direct (export CSV / admin) au site source, comme recommande dans le plan.\n// Respecter un rythme de requetes faible (delai entre pages) et un User-Agent identifie.\n\nconst response = $input.first().json;\nconst statusCode = response.statusCode || (response.body ? 200 : 0);\n\nif (statusCode !== 200 || !response.body) {\n  return [{\n    json: {\n      error: true,\n      message: 'Impossible de recuperer le sitemap. Statut: ' + statusCode + '. Verifier si le site bloque la requete ou a change de structure.',\n      productUrls: []\n    }\n  }];\n}\n\n// Extraction basique des URLs produits depuis le sitemap XML (regex simple, a adapter\n// selon la structure reelle du sitemap une fois confirmee)\nconst xml = response.body;\nconst urlMatches = [...xml.matchAll(/<loc>(.*?)<\\/loc>/g)].map(m => m[1]);\nconst productUrls = urlMatches.filter(u => u.includes('/produit/') || u.includes('/product/'));\n\nreturn [{\n  json: {\n    error: false,\n    totalFound: productUrls.length,\n    productUrls: productUrls.slice(0, 200)\n  }\n}];"
+        "jsCode": "// IMPORTANT : mortalla.com bloque le crawl automatise via robots.txt.\n// Ce workflow est une solution de SECOURS uniquement, a utiliser en attendant\n// un acces direct (export CSV / admin) au site source, comme recommande dans le plan.\n// Respecter un rythme de requetes faible (delai entre pages) et un User-Agent identifie.\n\nconst response = $input.first().json;\nconst statusCode = response.statusCode || (response.body ? 200 : 0);\n\nif (statusCode !== 200 || !response.body) {\n  return [{\n    json: {\n      error: true,\n      message: 'Impossible de recuperer le sitemap. Statut: ' + statusCode + '. Verifier si le site bloque la requete ou a change de structure.',\n      productUrls: []\n    }\n  }];\n}\n\n// Extraction basique des URLs produits depuis le sitemap XML (regex simple, a adapter\n// selon la structure reelle du sitemap une fois confirmee)\nconst xml = response.body;\nconst urlMatches = [...xml.matchAll(/<loc>(.*?)<\\/loc>/g)].map(m => m[1]);\nconst productUrls = urlMatches.filter(u => u.includes('/produit/') || u.includes('/product/'));\n\nreturn [{\n  json: {\n    error: false,\n    totalFound: productUrls.length,\n    productUrls: productUrls.slice(0, 200)\n  }\n}];"
       },
       "id": "parse-sitemap",
       "name": "Extraire URLs produits",
@@ -120,7 +120,7 @@
           "timeout": 15000,
           "headers": {
             "parameters": [
-              { "name": "User-Agent", "value": "CCB-CatalogSync-Bot/1.0 (+contact: awa.diop@yaqin-tech.com)" }
+              { "name": "User-Agent", "value": "MTS-CatalogSync-Bot/1.0 (+contact: admin@mortalla.com)" }
             ]
           }
         }
@@ -133,7 +133,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Extraction des donnees produit depuis le HTML.\n// ATTENTION : les selecteurs ci-dessous sont des hypotheses raisonnables.\n// A AJUSTER une fois la structure HTML reelle de ccbmateriaux.com confirmee.\n\nconst response = $input.first().json;\nconst statusCode = response.statusCode || 0;\n\nif (statusCode !== 200 || !response.body) {\n  return [{\n    json: {\n      error: true,\n      sourceUrl: $json.productUrls || '',\n      message: 'Page produit inaccessible (statut ' + statusCode + ')'\n    }\n  }];\n}\n\nconst html = response.body;\n\nfunction extract(regex) {\n  const m = html.match(regex);\n  return m ? m[1].trim() : null;\n}\n\nconst name = extract(/<h1[^>]*>(.*?)<\\/h1>/is)?.replace(/<[^>]+>/g, '');\nconst priceRaw = extract(/(?:prix|price)[^>]*>([\\d\\s.,]+)\\s*(?:FCFA|CFA)?/i);\nconst price = priceRaw ? parseInt(priceRaw.replace(/[\\s.,]/g, ''), 10) : null;\nconst imageUrl = extract(/<img[^>]+(?:class=\"[^\"]*product[^\"]*\"|id=\"main-image\")[^>]+src=\"([^\"]+)\"/i);\nconst description = extract(/<div[^>]*class=\"[^\"]*description[^\"]*\"[^>]*>(.*?)<\\/div>/is)?.replace(/<[^>]+>/g, '').trim();\n\nif (!name || !price) {\n  return [{\n    json: {\n      error: true,\n      sourceUrl: $json.productUrls || '',\n      message: 'Champs essentiels (nom/prix) introuvables. Selecteurs a ajuster.'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    error: false,\n    externalRef: $json.productUrls || '',\n    name,\n    price,\n    imageUrl,\n    description: description || null,\n    lastSyncedAt: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Extraction des donnees produit depuis le HTML.\n// ATTENTION : les selecteurs ci-dessous sont des hypotheses raisonnables.\n// A AJUSTER une fois la structure HTML reelle de mortalla.com confirmee.\n\nconst response = $input.first().json;\nconst statusCode = response.statusCode || 0;\n\nif (statusCode !== 200 || !response.body) {\n  return [{\n    json: {\n      error: true,\n      sourceUrl: $json.productUrls || '',\n      message: 'Page produit inaccessible (statut ' + statusCode + ')'\n    }\n  }];\n}\n\nconst html = response.body;\n\nfunction extract(regex) {\n  const m = html.match(regex);\n  return m ? m[1].trim() : null;\n}\n\nconst name = extract(/<h1[^>]*>(.*?)<\\/h1>/is)?.replace(/<[^>]+>/g, '');\nconst priceRaw = extract(/(?:prix|price)[^>]*>([\\d\\s.,]+)\\s*(?:FCFA|CFA)?/i);\nconst price = priceRaw ? parseInt(priceRaw.replace(/[\\s.,]/g, ''), 10) : null;\nconst imageUrl = extract(/<img[^>]+(?:class=\"[^\"]*product[^\"]*\"|id=\"main-image\")[^>]+src=\"([^\"]+)\"/i);\nconst description = extract(/<div[^>]*class=\"[^\"]*description[^\"]*\"[^>]*>(.*?)<\\/div>/is)?.replace(/<[^>]+>/g, '').trim();\n\nif (!name || !price) {\n  return [{\n    json: {\n      error: true,\n      sourceUrl: $json.productUrls || '',\n      message: 'Champs essentiels (nom/prix) introuvables. Selecteurs a ajuster.'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    error: false,\n    externalRef: $json.productUrls || '',\n    name,\n    price,\n    imageUrl,\n    description: description || null,\n    lastSyncedAt: new Date().toISOString()\n  }\n}];"
       },
       "id": "parse-product-page",
       "name": "Parser donnees produit",
@@ -165,7 +165,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ externalRef: $json.externalRef, name: $json.name, price: $json.price, imageUrl: $json.imageUrl, description: $json.description, lastSyncedAt: $json.lastSyncedAt, source: 'scraping_ccbmateriaux' }) }}",
+        "jsonBody": "={{ JSON.stringify({ externalRef: $json.externalRef, name: $json.name, price: $json.price, imageUrl: $json.imageUrl, description: $json.description, lastSyncedAt: $json.lastSyncedAt, source: 'mts_catalogue_sync' }) }}",
         "options": {}
       },
       "id": "upsert-product",
@@ -175,8 +175,8 @@
       "position": [580, 200],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "ccb-api-key-credential",
-          "name": "CCB API Key"
+          "id": "mts-api-key-credential",
+          "name": "MTS API Key"
         }
       }
     },

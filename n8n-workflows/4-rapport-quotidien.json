@@ -1,0 +1,70 @@
+{
+  "name": "MTS - 4. Rapport quotidien 20h",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 20 * * *" }]
+        }
+      },
+      "id": "cron-20h",
+      "name": "Chaque jour à 20h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.NEXT_PUBLIC_APP_URL }}/api/admin/orders?limit=200",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "x-api-key", "value": "={{ $env.INTERNAL_API_KEY }}" }]
+        }
+      },
+      "id": "get-orders",
+      "name": "Commandes du jour",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const orders = $input.first().json.data || [];\nconst today = new Date().toDateString();\nconst todayOrders = orders.filter(o => new Date(o.createdAt).toDateString() === today);\nconst total = todayOrders.reduce((s, o) => s + Number(o.total || 0), 0);\nconst paid = todayOrders.filter(o => ['PAYE','EN_PREPARATION','EN_LIVRAISON','LIVREE'].includes(o.status));\nconst pending = todayOrders.filter(o => o.status === 'PRE_CONFIRMEE');\nconst delivered = todayOrders.filter(o => o.status === 'LIVREE');\nconst ca = paid.reduce((s, o) => s + Number(o.total || 0), 0);\nreturn [{ json: {\n  date: new Date().toLocaleDateString('fr-FR'),\n  nb_commandes: todayOrders.length,\n  nb_payees: paid.length,\n  nb_en_attente: pending.length,\n  nb_livrees: delivered.length,\n  ca_fcfa: ca.toLocaleString('fr-FR'),\n  total_commandes_fcfa: total.toLocaleString('fr-FR')\n}}];"
+      },
+      "id": "compute-stats",
+      "name": "Calculer statistiques",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.WHATSAPP_ADMIN_NUMBER.replace('+', '') }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"📊 *Rapport MTS — {{ $json.date }}*\\n\\n🛍️ Commandes : *{{ $json.nb_commandes }}*\\n✅ Payées : *{{ $json.nb_payees }}*\\n⏳ En attente : *{{ $json.nb_en_attente }}*\\n📦 Livrées : *{{ $json.nb_livrees }}*\\n\\n💰 CA confirmé : *{{ $json.ca_fcfa }} FCFA*\\n\\nBonne nuit ! 🌙\"\n  }\n}"
+      },
+      "id": "send-rapport",
+      "name": "Envoyer rapport WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Chaque jour à 20h": { "main": [[{ "node": "Commandes du jour", "type": "main", "index": 0 }]] },
+    "Commandes du jour": { "main": [[{ "node": "Calculer statistiques", "type": "main", "index": 0 }]] },
+    "Calculer statistiques": { "main": [[{ "node": "Envoyer rapport WhatsApp", "type": "main", "index": 0 }]] }
+  },
+  "active": true,
+  "tags": ["MTS", "rapport", "cron"]
+}

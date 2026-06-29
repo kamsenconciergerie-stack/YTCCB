@@ -7,55 +7,52 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Enums ───────────────────────────────────────────────────────────────────
+// ─── Enums ────────────────────────────────────────────────────────────────────
 
-enum ProductCategory {
-  GROS_OEUVRE
-  ETANCHEITE
-  CARRELAGE
-  PLOMBERIE
-  ELECTRICITE
-  SANITAIRES
-  ELECTROMENAGER
-  SOLAIRE
+enum ChaussureCategorie {
+  FEMME
+  HOMME
+  ENFANT
+  SPORT
+  SANDALES
+  BOTTES
+  ESCARPINS
+  SNEAKERS
+  ACCESSOIRES
+}
+
+enum SourceImport {
+  MANUEL
+  CSV
+  API
 }
 
 enum OrderStatus {
-  PRE_CONFIRMED  // pré-confirmée — en attente de validation
-  CONFIRMED      // confirmée — validée par l'équipe
-  IN_PREPARATION // en préparation
-  IN_DELIVERY    // en livraison
-  DELIVERED      // livrée
-  CANCELLED      // annulée
+  PRE_CONFIRMEE  // créée, en attente de paiement
+  PAYE           // paiement reçu
+  EN_PREPARATION // en cours de préparation
+  EN_LIVRAISON   // confiée au livreur
+  LIVREE         // livrée au client
+  EXPIREE        // non payée après 30 min
+  ANNULEE        // annulée manuellement
 }
 
-enum OrderChannel {
-  WHATSAPP
+enum CanalFinalisation {
   WEB
-  MANUAL   // saisie manuelle back-office (vente téléphone/boutique)
-  PHONE    // prise de commande téléphonique directe
+  WHATSAPP
 }
 
-enum LeadStatus {
-  NEW          // nouveau
-  CONTACTED    // contacté
-  QUOTE_SENT   // devis envoyé
-  WON          // gagné
-  LOST         // perdu
+enum StatutPaiement {
+  EN_ATTENTE
+  PAYE
+  ECHOUE
+  REMBOURSE
 }
 
 enum PaymentProvider {
   WAVE
   ORANGE_MONEY
-  ON_DELIVERY  // paiement à la livraison
-}
-
-enum PaymentStatus {
-  PENDING
-  COMPLETED
-  FAILED
-  REFUNDED
-  EXPIRED
+  A_LA_LIVRAISON
 }
 
 enum UserRole {
@@ -63,120 +60,127 @@ enum UserRole {
   COMMERCIAL
 }
 
-// ─── Utilisateurs admin ────────────────────────────────────────────────────────
+// ─── Paramètres boutique ─────────────────────────────────────────────────────
+
+model ParametresBoutique {
+  cle       String   @id
+  valeur    String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("parametres_boutique")
+}
+
+// ─── Utilisateurs admin ───────────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  passwordHash  String    @map("password_hash")
-  name          String
-  role          UserRole  @default(COMMERCIAL)
-  isActive      Boolean   @default(true) @map("is_active")
-  salesRepId    String?   @unique @map("sales_rep_id") // lien optionnel vers le profil commercial
-  lastLoginAt   DateTime? @map("last_login_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  salesRep SalesRep? @relation(fields: [salesRepId], references: [id])
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String
+  role         UserRole  @default(COMMERCIAL)
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
-// ─── Zones de livraison ────────────────────────────────────────────────────────
+// ─── Zones de livraison ───────────────────────────────────────────────────────
 
 model DeliveryZone {
   id          String   @id @default(uuid())
-  name        String   // ex: "Dakar Centre", "Banlieue Dakar", "Thiès"
+  name        String
   description String?
   baseFee     Decimal  @map("base_fee") @db.Decimal(10, 2)
-  perKmFee    Decimal? @map("per_km_fee") @db.Decimal(10, 2)
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  salesReps SalesRep[]
-  orders    Order[]
+  livreurs Livreur[]
+  orders   Order[]
 
   @@map("delivery_zones")
 }
 
-// ─── Commerciaux ──────────────────────────────────────────────────────────────
+// ─── Livreurs ─────────────────────────────────────────────────────────────────
 
-model SalesRep {
-  id             String  @id @default(uuid())
-  name           String
-  // Format normalisé : +221XXXXXXXXX (identifiant unique WhatsApp)
-  whatsappNumber String  @unique @map("whatsapp_number")
-  email          String? @unique
-  deliveryZoneId String? @map("delivery_zone_id")
-  isActive       Boolean @default(true) @map("is_active")
+model Livreur {
+  id             String   @id @default(uuid())
+  nom            String
+  telephone      String   @unique
+  whatsappNumber String?  @unique @map("whatsapp_number")
+  deliveryZoneId String?  @map("delivery_zone_id")
+  actif          Boolean  @default(true)
+  disponible     Boolean  @default(true)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  deliveryZone    DeliveryZone?    @relation(fields: [deliveryZoneId], references: [id])
-  leadAssignments LeadAssignment[]
-  user            User?
+  deliveryZone DeliveryZone? @relation(fields: [deliveryZoneId], references: [id])
+  orders       Order[]
 
-  @@index([whatsappNumber])
-  @@map("sales_reps")
+  @@index([actif, disponible])
+  @@map("livreurs")
 }
 
-// ─── Produits ─────────────────────────────────────────────────────────────────
+// ─── Chaussures ───────────────────────────────────────────────────────────────
 
-model Product {
-  id                String          @id @default(uuid())
-  name              String
-  slug              String          @unique
-  description       String?
-  category          ProductCategory
-  price             Decimal         @db.Decimal(10, 2)
-  stockQty          Int             @default(0) @map("stock_qty")
-  lowStockThreshold Int             @default(5) @map("low_stock_threshold")
-  imageUrl          String?         @map("image_url")
-  images            String[]        // images supplémentaires
-  // Unité de vente : unité, kg, m², sac, rouleau, litre, etc.
-  unit              String          @default("unité")
-  sku               String?         @unique
-  brand             String?
-  isActive          Boolean         @default(true) @map("is_active")
-  // Snapshot de la source catalogue pour la sync n8n (étape 5.3)
-  externalRef       String?         @map("external_ref")
-  lastSyncedAt      DateTime?       @map("last_synced_at")
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
+model Chaussure {
+  id                   String             @id @default(uuid())
+  // Référence unique : MTS-2026-001
+  reference            String             @unique
+  nom                  String
+  marque               String?
+  categorie            ChaussureCategorie
+  couleur              String?
+  // Tableau JSON des pointures disponibles : ["36","37","38","39","40"]
+  pointuresDisponibles Json               @default("[]") @map("pointures_disponibles")
+  prix                 Decimal            @db.Decimal(10, 2)
+  prixPromo            Decimal?           @map("prix_promo") @db.Decimal(10, 2)
+  stockTotal           Int                @default(0) @map("stock_total")
+  // Stock par pointure : {"36": 5, "37": 3, "38": 0}
+  stocksParPointure    Json               @default("{}") @map("stocks_par_pointure")
+  description          String?
+  // Tableau JSON d'URLs images
+  images               Json               @default("[]")
+  fournisseurRef       String?            @map("fournisseur_ref")
+  actif                Boolean            @default(true)
+  featured             Boolean            @default(false)
+  dateImport           DateTime?          @map("date_import")
+  sourceImport         SourceImport       @default(MANUEL) @map("source_import")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
 
   orderItems OrderItem[]
-  reviews    ProductReview[]
 
-  @@index([category])
-  @@index([isActive])
-  @@index([isActive, category])
-  @@index([slug])
-  @@map("products")
+  @@index([categorie])
+  @@index([actif])
+  @@index([featured])
+  @@index([actif, categorie])
+  @@index([reference])
+  @@index([actif, featured])
+  @@map("chaussures")
 }
 
-// ─── Clients ──────────────────────────────────────────────────────────────────
+// ─── Clients ─────────────────────────────────────────────────────────────────
 
 model Customer {
   id             String   @id @default(uuid())
   // Identifiant principal — format normalisé : +221XXXXXXXXX
-  // La normalisation (suppression espaces, ajout indicatif pays) est faite côté application
   whatsappNumber String   @unique @map("whatsapp_number")
   name           String?
   email          String?  @unique
   address        String?
   city           String?
   isBlocked      Boolean  @default(false) @map("is_blocked")
-  totalOrders    Int      @default(0) @map("total_orders")   // dénormalisé pour perf dashboard
+  // Dénormalisé pour perf dashboard
+  totalOrders    Int      @default(0) @map("total_orders")
   totalSpent     Decimal  @default(0) @map("total_spent") @db.Decimal(12, 2)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  orders             Order[]
-  leads              Lead[]
-  loyaltyPoints      LoyaltyPoint[]
-  reviews            ProductReview[]
-  conversationStates ConversationState[]
+  orders        Order[]
+  loyaltyPoints LoyaltyPoint[]
 
   @@index([whatsappNumber])
   @@map("customers")
@@ -185,147 +189,104 @@ model Customer {
 // ─── Commandes ────────────────────────────────────────────────────────────────
 
 model Order {
-  id             String       @id @default(uuid())
-  // Référence lisible : CCB-YYYYMM-NNNN (générée côté app avant INSERT)
-  orderNumber    String       @unique @map("order_number")
-  customerId     String       @map("customer_id")
-  deliveryZoneId String?      @map("delivery_zone_id")
-  status         OrderStatus  @default(PRE_CONFIRMED)
-  channel        OrderChannel
-  subtotal       Decimal      @db.Decimal(10, 2)
-  deliveryFee    Decimal      @default(0) @map("delivery_fee") @db.Decimal(10, 2)
-  discount       Decimal      @default(0) @db.Decimal(10, 2)
-  total          Decimal      @db.Decimal(10, 2)
-  deliveryAddress String?     @map("delivery_address")
-  deliveryCity    String?     @map("delivery_city")
-  notes          String?
-  cancelReason   String?      @map("cancel_reason")
-  confirmedAt    DateTime?    @map("confirmed_at")
-  deliveredAt    DateTime?    @map("delivered_at")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
+  id                String            @id @default(uuid())
+  // Format : MTS-YYYYMMDD-XXXX (généré côté app avant INSERT)
+  numeroCommande    String            @unique @map("numero_commande")
+  customerId        String            @map("customer_id")
+  deliveryZoneId    String?           @map("delivery_zone_id")
+  livreurId         String?           @map("livreur_id")
+  status            OrderStatus       @default(PRE_CONFIRMEE)
+  canalFinalisation CanalFinalisation @map("canal_finalisation")
+  statutPaiement    StatutPaiement    @default(EN_ATTENTE) @map("statut_paiement")
+  subtotal          Decimal           @db.Decimal(10, 2)
+  deliveryFee       Decimal           @default(0) @map("delivery_fee") @db.Decimal(10, 2)
+  discount          Decimal           @default(0) @db.Decimal(10, 2)
+  total             Decimal           @db.Decimal(10, 2)
+  deliveryAddress   String?           @map("delivery_address")
+  deliveryCity      String?           @map("delivery_city")
+  // Lien Wave pour paiement (valable 30 min)
+  lienPaiementWave  String?           @map("lien_paiement_wave")
+  notes             String?
+  cancelReason      String?           @map("cancel_reason")
+  // Expiration automatique si non payée (PRE_CONFIRMEE + 30 min)
+  expiresAt         DateTime?         @map("expires_at")
+  paidAt            DateTime?         @map("paid_at")
+  deliveredAt       DateTime?         @map("delivered_at")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
 
   customer     Customer      @relation(fields: [customerId], references: [id])
   deliveryZone DeliveryZone? @relation(fields: [deliveryZoneId], references: [id])
+  livreur      Livreur?      @relation(fields: [livreurId], references: [id])
   items        OrderItem[]
   payments     Payment[]
 
   @@index([status])
-  @@index([channel])
+  @@index([statutPaiement])
+  @@index([canalFinalisation])
   @@index([customerId])
   @@index([createdAt])
-  @@index([status, channel])
-  @@index([status, createdAt]) // pour le dashboard temps réel
+  @@index([status, createdAt])
+  @@index([expiresAt]) // pour le cron d'expiration (workflow 3)
   @@map("orders")
 }
 
-// ─── Lignes de commande ───────────────────────────────────────────────────────
+// ─── Lignes de commande ──────────────────────────────────────────────────────
 
 model OrderItem {
-  id          String  @id @default(uuid())
-  orderId     String  @map("order_id")
-  productId   String  @map("product_id")
-  quantity    Int
-  unitPrice   Decimal @map("unit_price") @db.Decimal(10, 2)
-  totalPrice  Decimal @map("total_price") @db.Decimal(10, 2)
-  // Snapshot du nom et SKU au moment de la commande (résistant aux modifications produit)
-  productName String  @map("product_name")
-  productSku  String? @map("product_sku")
-  unit        String  @default("unité")
+  id            String  @id @default(uuid())
+  orderId       String  @map("order_id")
+  chaussureId   String  @map("chaussure_id")
+  quantity      Int
+  // Snapshot au moment de la commande
+  pointure      String?
+  couleur       String?
+  unitPrice     Decimal @map("unit_price") @db.Decimal(10, 2)
+  totalPrice    Decimal @map("total_price") @db.Decimal(10, 2)
+  chaussureNom  String  @map("chaussure_nom")
+  chaussureRef  String  @map("chaussure_ref")
 
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  chaussure Chaussure @relation(fields: [chaussureId], references: [id])
 
   @@index([orderId])
-  @@index([productId])
+  @@index([chaussureId])
   @@map("order_items")
-}
-
-// ─── Leads (pipeline commercial) ─────────────────────────────────────────────
-
-model Lead {
-  id             String     @id @default(uuid())
-  customerId     String?    @map("customer_id")
-  // Numéro WhatsApp si le client n'est pas encore créé en base
-  whatsappNumber String?    @map("whatsapp_number")
-  name           String?
-  company        String?
-  status         LeadStatus @default(NEW)
-  source         String?    // WhatsApp entrant, recommandation, visite boutique, etc.
-  notes          String?
-  estimatedValue Decimal?   @map("estimated_value") @db.Decimal(10, 2)
-  wonAt          DateTime?  @map("won_at")
-  lostAt         DateTime?  @map("lost_at")
-  lostReason     String?    @map("lost_reason")
-  createdAt      DateTime   @default(now()) @map("created_at")
-  updatedAt      DateTime   @updatedAt @map("updated_at")
-
-  customer    Customer?        @relation(fields: [customerId], references: [id])
-  assignments LeadAssignment[]
-
-  @@index([status])
-  @@index([whatsappNumber])
-  @@index([customerId])
-  @@map("leads")
-}
-
-// ─── Assignation des leads ───────────────────────────────────────────────────
-
-model LeadAssignment {
-  id           String    @id @default(uuid())
-  leadId       String    @map("lead_id")
-  salesRepId   String    @map("sales_rep_id")
-  assignedAt   DateTime  @default(now()) @map("assigned_at")
-  unassignedAt DateTime? @map("unassigned_at")
-  // Un seul isCurrent=true par lead à tout moment (contrainte gérée côté app)
-  isCurrent    Boolean   @default(true) @map("is_current")
-
-  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  salesRep SalesRep @relation(fields: [salesRepId], references: [id])
-
-  @@index([leadId, isCurrent])
-  @@index([salesRepId, isCurrent])
-  @@map("lead_assignments")
 }
 
 // ─── Paiements ────────────────────────────────────────────────────────────────
 
 model Payment {
-  id             String          @id @default(uuid())
-  orderId        String          @map("order_id")
-  provider       PaymentProvider
-  status         PaymentStatus   @default(PENDING)
-  amount         Decimal         @db.Decimal(10, 2)
-  currency       String          @default("XOF")
-  // Référence côté fournisseur (Wave transaction ID, Orange Money ref, etc.)
-  transactionRef String?         @unique @map("transaction_ref")
-  // ID de paiement interne fournisseur (pour reconciliation)
-  providerPaymentId String?      @map("provider_payment_id")
-  paymentLink    String?         @map("payment_link")
-  failureReason  String?         @map("failure_reason")
-  // Clé d'idempotence : empêche le double-traitement des webhooks Wave/Orange Money
-  idempotencyKey String          @unique @map("idempotency_key")
-  webhookPayload Json?           @map("webhook_payload") // raw payload pour audit
-  paidAt         DateTime?       @map("paid_at")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
+  id                String          @id @default(uuid())
+  orderId           String          @map("order_id")
+  provider          PaymentProvider
+  amount            Decimal         @db.Decimal(10, 2)
+  currency          String          @default("XOF")
+  transactionRef    String?         @unique @map("transaction_ref")
+  providerPaymentId String?         @map("provider_payment_id")
+  paymentLink       String?         @map("payment_link")
+  failureReason     String?         @map("failure_reason")
+  // Clé d'idempotence — empêche double traitement des webhooks
+  idempotencyKey    String          @unique @map("idempotency_key")
+  webhookPayload    Json?           @map("webhook_payload")
+  paidAt            DateTime?       @map("paid_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
 
   order Order @relation(fields: [orderId], references: [id])
 
   @@index([orderId])
-  @@index([status])
   @@index([transactionRef])
   @@map("payments")
 }
 
-// ─── Points de fidélité ───────────────────────────────────────────────────────
+// ─── Points de fidélité ──────────────────────────────────────────────────────
 
 model LoyaltyPoint {
   id         String   @id @default(uuid())
   customerId String   @map("customer_id")
-  // Ledger : positif = crédité, négatif = dépensé
   points     Int
-  reason     String   // ex: "ORDER_CCB-202406-0001", "WELCOME_BONUS", "REDEEMED"
+  reason     String
   orderId    String?  @map("order_id")
   createdAt  DateTime @default(now()) @map("created_at")
 
@@ -335,46 +296,19 @@ model LoyaltyPoint {
   @@map("loyalty_points")
 }
 
-// ─── Avis produits ────────────────────────────────────────────────────────────
+// ─── Logs d'import CSV ────────────────────────────────────────────────────────
 
-model ProductReview {
-  id         String   @id @default(uuid())
-  productId  String   @map("product_id")
-  customerId String   @map("customer_id")
-  rating     Int      // 1–5
-  comment    String?
-  isApproved Boolean  @default(false) @map("is_approved")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+model ImportLog {
+  id                 String   @id @default(uuid())
+  date               DateTime @default(now())
+  fichier            String
+  nbArticlesImportes Int      @default(0) @map("nb_articles_importes")
+  nbErreurs          Int      @default(0) @map("nb_erreurs")
+  // SUCCESS | PARTIAL | ERROR
+  statut             String
+  detailsErreurs     Json?    @map("details_erreurs")
+  createdAt          DateTime @default(now()) @map("created_at")
 
-  product  Product  @relation(fields: [productId], references: [id])
-  customer Customer @relation(fields: [customerId], references: [id])
-
-  @@unique([productId, customerId]) // un avis par client par produit
-  @@index([productId, isApproved])
-  @@map("product_reviews")
-}
-
-// ─── État de conversation WhatsApp (bot — étape 5.2) ─────────────────────────
-
-model ConversationState {
-  id             String    @id @default(uuid())
-  customerId     String?   @map("customer_id")
-  // WhatsApp number dupliqué ici pour retrouver les états même avant création client
-  whatsappNumber String    @map("whatsapp_number")
-  // Étape courante du flow : SELECT_CATEGORY | SELECT_PRODUCT | ENTER_QUANTITY |
-  // ENTER_ADDRESS | CONFIRM_ORDER | SELECT_PAYMENT | AWAITING_PAYMENT | DONE
-  step           String
-  // Contexte sérialisé : category, productId, quantity, address, cart, etc.
-  context        Json      @default("{}")
-  // Expiration : conversation WhatsApp inactive = 24h par défaut
-  expiresAt      DateTime  @map("expires_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-
-  customer Customer? @relation(fields: [customerId], references: [id])
-
-  @@index([whatsappNumber])
-  @@index([expiresAt]) // pour nettoyage périodique des sessions expirées
-  @@map("conversation_states")
+  @@index([date])
+  @@map("import_logs")
 }

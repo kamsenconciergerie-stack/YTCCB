@@ -1,24 +1,31 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { ProductForm } from "../../ProductForm";
+import { requireAdminSession } from "@/lib/admin-guard";
+import { redirect } from "next/navigation";
+import { ChaussureForm } from "../../ChaussureForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function ModifierProduitPage({ params }: { params: { id: string } }) {
-  const product = await prisma.product.findUnique({
+export default async function ModifierChaussurePage({ params }: { params: { id: string } }) {
+  const { error } = await requireAdminSession();
+  if (error) redirect("/admin/login");
+
+  const ch = await prisma.chaussure.findUnique({
     where: { id: params.id },
-    select: { id: true, name: true, category: true, price: true, stockQty: true, lowStockThreshold: true, unit: true, description: true, brand: true, imageUrl: true, sku: true, isActive: true },
+    select: {
+      id: true, reference: true, nom: true, marque: true, categorie: true,
+      couleur: true, prix: true, prixPromo: true, stockTotal: true,
+      pointuresDisponibles: true, stocksParPointure: true,
+      description: true, images: true, actif: true, featured: true,
+    },
   });
 
-  if (!product) notFound();
+  if (!ch) notFound();
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-3">
-        <a href="/admin/catalogue" className="text-sm text-gray-400 hover:text-gray-600">← Catalogue</a>
-        <h1 className="text-2xl font-display font-semibold" style={{ color: "var(--ccb-green)" }}>Modifier le produit</h1>
-      </div>
-      <ProductForm initial={{ ...product, price: Number(product.price), imageUrl: product.imageUrl ?? undefined, description: product.description ?? undefined, brand: product.brand ?? undefined, sku: product.sku ?? undefined }} />
+    <div className="max-w-2xl">
+      <h1 className="text-xl font-black uppercase mb-6">Modifier — {ch.nom}</h1>
+      <ChaussureForm chaussure={ch as never} />
     </div>
   );
 }

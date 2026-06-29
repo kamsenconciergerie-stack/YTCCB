@@ -1,126 +1,156 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { formatPrice, formatDate } from "@/lib/format";
+import { requireAdminSession } from "@/lib/admin-guard";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Commandes — Admin CCB" };
+export const metadata: Metadata = { title: "Commandes — Admin MTS" };
 export const dynamic = "force-dynamic";
 
 const STATUS_LABELS: Record<string, string> = {
-  PRE_CONFIRMED:  "Pré-confirmée",
-  CONFIRMED:      "Confirmée",
-  IN_PREPARATION: "En préparation",
-  IN_DELIVERY:    "En livraison",
-  DELIVERED:      "Livrée",
-  CANCELLED:      "Annulée",
+  PRE_CONFIRMEE:  "Pré-confirmée",
+  PAYE:           "Payée",
+  EN_PREPARATION: "En préparation",
+  EN_LIVRAISON:   "En livraison",
+  LIVREE:         "Livrée",
+  EXPIREE:        "Expirée",
+  ANNULEE:        "Annulée",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  PRE_CONFIRMED:  "bg-yellow-100 text-yellow-800",
-  CONFIRMED:      "bg-blue-100 text-blue-800",
-  IN_PREPARATION: "bg-purple-100 text-purple-800",
-  IN_DELIVERY:    "bg-orange-100 text-orange-800",
-  DELIVERED:      "bg-green-100 text-green-800",
-  CANCELLED:      "bg-red-100 text-red-800",
+const STATUS_CSS: Record<string, string> = {
+  PRE_CONFIRMEE:  "badge-status-pre-confirmee",
+  PAYE:           "badge-status-paye",
+  EN_PREPARATION: "badge-status-en-preparation",
+  EN_LIVRAISON:   "badge-status-en-livraison",
+  LIVREE:         "badge-status-livree",
+  EXPIREE:        "badge-status-expiree",
+  ANNULEE:        "badge-status-annulee",
 };
 
-const CHANNEL_LABELS: Record<string, string> = {
-  WHATSAPP: "WhatsApp", WEB: "Web", MANUAL: "Manuel", PHONE: "Téléphone",
-};
+type Props = { searchParams?: { status?: string; canal?: string; page?: string } };
 
-const ALL_STATUSES = Object.keys(STATUS_LABELS);
+export default async function CommandesPage({ searchParams }: Props) {
+  const { error } = await requireAdminSession();
+  if (error) redirect("/admin/login");
 
-export default async function CommandesPage({ searchParams }: { searchParams: { status?: string } }) {
-  const status = ALL_STATUSES.includes(searchParams.status ?? "") ? searchParams.status : undefined;
+  const status = searchParams?.status ?? "";
+  const canal = searchParams?.canal ?? "";
+  const page = parseInt(searchParams?.page ?? "1", 10);
+  const limit = 25;
 
-  const orders = await prisma.order.findMany({
-    where: status ? { status: status as never } : {},
-    orderBy: { createdAt: "desc" },
-    take: 100,
-    include: {
-      customer: { select: { name: true, whatsappNumber: true } },
-      _count: { select: { items: true } },
-    },
-  });
+  const where: Record<string, unknown> = {};
+  if (status) where.status = status;
+  if (canal) where.canalFinalisation = canal;
 
-  const counts = await prisma.order.groupBy({ by: ["status"], _count: { _all: true } });
-  const countMap: Record<string, number> = {};
-  counts.forEach((c) => { countMap[c.status] = c._count._all; });
+  const [total, commandes] = await Promise.all([
+    prisma.order.count({ where }),
+    prisma.order.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        customer: { select: { name: true, whatsappNumber: true } },
+        livreur: { select: { nom: true } },
+        items: { select: { chaussureNom: true, quantity: true, pointure: true }, take: 3 },
+      },
+    }),
+  ]);
+
+  const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-display font-semibold" style={{ color: "var(--ccb-green)" }}>
-          Commandes
-        </h1>
-        <a href="/admin/commandes/nouvelle" className="btn-gold text-sm px-4 py-2">
-          + Nouvelle commande
-        </a>
-      </div>
-
-      {/* Filtres statut */}
-      <div className="flex flex-wrap gap-2">
-        <a href="/admin/commandes"
-          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${!status ? "text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-          style={!status ? { backgroundColor: "var(--ccb-green)" } : {}}
-        >
-          Toutes ({orders.length > 0 && !status ? orders.length : Object.values(countMap).reduce((a, b) => a + b, 0)})
-        </a>
-        {ALL_STATUSES.map((s) => (
-          <a key={s} href={`/admin/commandes?status=${s}`}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${status === s ? "text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-            style={status === s ? { backgroundColor: "var(--ccb-gold)" } : {}}
-          >
-            {STATUS_LABELS[s]} ({countMap[s] ?? 0})
-          </a>
-        ))}
-      </div>
-
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
-              <tr>
-                <th className="px-5 py-3 text-left">N° commande</th>
-                <th className="px-5 py-3 text-left">Client</th>
-                <th className="px-5 py-3 text-left">Canal</th>
-                <th className="px-5 py-3 text-left">Statut</th>
-                <th className="px-5 py-3 text-right">Total</th>
-                <th className="px-5 py-3 text-left">Date</th>
-                <th className="px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {orders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3 font-mono font-semibold text-gray-900 text-xs">
-                    {order.orderNumber}
-                  </td>
-                  <td className="px-5 py-3 text-gray-700">
-                    <div>{order.customer.name ?? "—"}</div>
-                    <div className="text-xs text-gray-400">{order.customer.whatsappNumber}</div>
-                  </td>
-                  <td className="px-5 py-3 text-gray-500">{CHANNEL_LABELS[order.channel] ?? order.channel}</td>
-                  <td className="px-5 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-700"}`}>
-                      {STATUS_LABELS[order.status] ?? order.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-right font-semibold">{formatPrice(order.total)}</td>
-                  <td className="px-5 py-3 text-gray-400 text-xs whitespace-nowrap">{formatDate(order.createdAt)}</td>
-                  <td className="px-5 py-3">
-                    <a href={`/admin/commandes/${order.id}`} className="text-xs font-medium hover:underline" style={{ color: "var(--ccb-gold)" }}>
-                      Détails →
-                    </a>
-                  </td>
-                </tr>
-              ))}
-              {orders.length === 0 && (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400">Aucune commande</td></tr>
-              )}
-            </tbody>
-          </table>
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-black uppercase">Commandes</h1>
+          <p className="text-sm text-gray-500">{total} commande{total > 1 ? "s" : ""}</p>
         </div>
       </div>
+
+      {/* Filtres */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {[{ label: "Toutes", val: "" }, ...Object.entries(STATUS_LABELS).map(([v, l]) => ({ label: l, val: v }))].map(({ label, val }) => (
+          <Link
+            key={val}
+            href={`/admin/commandes?${val ? `status=${val}` : ""}${canal ? `&canal=${canal}` : ""}`}
+            className={`text-xs px-3 py-1.5 border transition-colors font-semibold ${status === val ? "bg-[#1A1A1A] text-white border-[#1A1A1A]" : "border-gray-200 hover:border-[#1A1A1A]"}`}
+          >
+            {label}
+          </Link>
+        ))}
+        <span className="w-px bg-gray-200 mx-1" />
+        {[{ label: "🌐 Web", val: "WEB" }, { label: "💬 WA", val: "WHATSAPP" }].map(({ label, val }) => (
+          <Link
+            key={val}
+            href={`/admin/commandes?${status ? `status=${status}&` : ""}canal=${val}`}
+            className={`text-xs px-3 py-1.5 border transition-colors font-semibold ${canal === val ? "bg-[#1A1A1A] text-white border-[#1A1A1A]" : "border-gray-200 hover:border-[#1A1A1A]"}`}
+          >
+            {label}
+          </Link>
+        ))}
+        {(status || canal) && (
+          <Link href="/admin/commandes" className="text-xs px-3 py-1.5 text-gray-400 hover:text-[#1A1A1A]">✕ Reset</Link>
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded border border-gray-100 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              {["Numéro", "Client", "Articles", "Total", "Canal", "Statut", "Livreur", "Date", ""].map((h) => (
+                <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {commandes.length === 0 ? (
+              <tr><td colSpan={9} className="text-center py-12 text-gray-400">Aucune commande.</td></tr>
+            ) : commandes.map((cmd) => (
+              <tr key={cmd.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3 font-mono text-xs font-semibold">{cmd.numeroCommande}</td>
+                <td className="px-4 py-3">
+                  <div className="font-medium">{cmd.customer?.name ?? "—"}</div>
+                  <div className="text-xs text-gray-400">{cmd.customer?.whatsappNumber}</div>
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-600 max-w-[150px]">
+                  {cmd.items.map((it) => (
+                    <div key={it.chaussureNom} className="truncate">{it.chaussureNom} ×{it.quantity}{it.pointure ? ` P${it.pointure}` : ""}</div>
+                  ))}
+                </td>
+                <td className="px-4 py-3 font-semibold">{Number(cmd.total).toLocaleString("fr-FR")} F</td>
+                <td className="px-4 py-3 text-xs">{cmd.canalFinalisation === "WHATSAPP" ? "💬 WA" : "🌐 Web"}</td>
+                <td className="px-4 py-3">
+                  <span className={STATUS_CSS[cmd.status] ?? ""}>{STATUS_LABELS[cmd.status] ?? cmd.status}</span>
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-500">{cmd.livreur?.nom ?? "—"}</td>
+                <td className="px-4 py-3 text-xs text-gray-400">
+                  {new Date(cmd.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </td>
+                <td className="px-4 py-3">
+                  <Link href={`/admin/commandes/${cmd.id}`} className="text-xs text-[#C4956A] font-semibold hover:underline">Détails</Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-2 mt-6">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <Link
+              key={p}
+              href={`/admin/commandes?${status ? `status=${status}&` : ""}${canal ? `canal=${canal}&` : ""}page=${p}`}
+              className={`w-9 h-9 flex items-center justify-center text-xs font-bold border transition-colors ${p === page ? "bg-[#1A1A1A] text-white border-[#1A1A1A]" : "border-gray-200 hover:border-[#1A1A1A]"}`}
+            >
+              {p}
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

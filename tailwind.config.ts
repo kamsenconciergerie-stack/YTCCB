@@ -9,44 +9,38 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Identité visuelle CCB — bleu #1D5BB0 / orange corail #F47551
-        ccb: {
-          green: {
-            DEFAULT: "#1D5BB0",
-            50:  "#EFF4FB",
-            100: "#D5E4F5",
-            200: "#ABCAEB",
-            300: "#81AFE0",
-            400: "#5795D6",
-            500: "#2D7ACC",
-            600: "#1D5BB0",
-            700: "#15428A",
-            800: "#0D2A5E",
-            900: "#061532",
-          },
-          gold: {
-            DEFAULT: "#F47551",
-            50:  "#FEF2EE",
-            100: "#FDDDD5",
-            200: "#FBBCAC",
-            300: "#F89A82",
-            400: "#F67968",
-            500: "#F47551",
-            600: "#E05A37",
-            700: "#B84428",
-            800: "#902F1A",
-            900: "#68200C",
-          },
+        // Palette Mor Talla Sandaga
+        mts: {
+          noir:     "#1A1A1A",
+          blanc:    "#FFFFFF",
+          or:       "#C4956A",
+          "or-dark":"#A87B52",
+          gris:     "#F5F5F5",
+          "gris-2": "#E8E8E8",
+          "gris-3": "#9CA3AF",
+          wa:       "#25D366", // WhatsApp green
         },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        display: ["Playfair Display", "Georgia", "serif"],
+        sans:    ["var(--font-inter)", "DM Sans", "system-ui", "sans-serif"],
+        display: ["var(--font-montserrat)", "Bebas Neue", "Impact", "sans-serif"],
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
-        "gradient-conic":
-          "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
+      },
+      animation: {
+        "marquee": "marquee 25s linear infinite",
+        "fade-up": "fadeUp 0.5s ease forwards",
+      },
+      keyframes: {
+        marquee: {
+          "0%":   { transform: "translateX(0%)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+        fadeUp: {
+          "0%":   { opacity: "0", transform: "translateY(16px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
       },
     },
   },

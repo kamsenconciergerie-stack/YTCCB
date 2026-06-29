@@ -1,5 +1,5 @@
 {
-  "name": "CCB - Suivi Paiements (Wave + Orange Money)",
+  "name": "MTS - Suivi Paiements (Wave + Orange Money)",
   "nodes": [
     {
       "parameters": {
@@ -13,7 +13,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [-1200, 200],
-      "webhookId": "ccb-payment-wave"
+      "webhookId": "mts-payment-wave"
     },
     {
       "parameters": {
@@ -27,7 +27,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [-1200, 500],
-      "webhookId": "ccb-payment-orange-money"
+      "webhookId": "mts-payment-orange-money"
     },
     {
       "parameters": {
@@ -159,8 +159,8 @@
       "position": [360, 350],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "ccb-api-key-credential",
-          "name": "CCB API Key"
+          "id": "mts-api-key-credential",
+          "name": "MTS API Key"
         }
       }
     },

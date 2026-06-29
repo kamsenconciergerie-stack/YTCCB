@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PaymentProviderSchema = z.enum(["WAVE", "ORANGE_MONEY", "ON_DELIVERY"]);
+export const PaymentProviderSchema = z.enum(["WAVE", "ORANGE_MONEY", "A_LA_LIVRAISON"]);
 
 export const InitiatePaymentSchema = z.object({
   orderId:     z.string().uuid(),

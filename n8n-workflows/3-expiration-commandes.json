@@ -1,0 +1,72 @@
+{
+  "name": "MTS - 3. Expiration commandes non payées",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 15 }] }
+      },
+      "id": "cron-15min",
+      "name": "Toutes les 15 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.NEXT_PUBLIC_APP_URL }}/api/admin/orders?status=PRE_CONFIRMEE&limit=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "x-api-key", "value": "={{ $env.INTERNAL_API_KEY }}" }]
+        }
+      },
+      "id": "get-pending",
+      "name": "Récupérer commandes en attente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const orders = $input.first().json.data || [];\nconst now = Date.now();\nconst expired = orders.filter(o => {\n  if (!o.expiresAt) return false;\n  return new Date(o.expiresAt).getTime() < now;\n});\nreturn expired.map(o => ({ json: o }));"
+      },
+      "id": "filter-expired",
+      "name": "Filtrer expirées",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.NEXT_PUBLIC_APP_URL }}/api/n8n/order-status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.INTERNAL_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "orderId", "value": "={{ $json.id }}" },
+            { "name": "status", "value": "EXPIREE" }
+          ]
+        }
+      },
+      "id": "mark-expired",
+      "name": "Marquer EXPIREE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Toutes les 15 min": { "main": [[{ "node": "Récupérer commandes en attente", "type": "main", "index": 0 }]] },
+    "Récupérer commandes en attente": { "main": [[{ "node": "Filtrer expirées", "type": "main", "index": 0 }]] },
+    "Filtrer expirées": { "main": [[{ "node": "Marquer EXPIREE", "type": "main", "index": 0 }]] }
+  },
+  "active": true,
+  "tags": ["MTS", "cron", "expiration"]
+}

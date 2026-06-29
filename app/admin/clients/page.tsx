@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { formatPrice, formatDate } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Clients — Admin CCB" };
+export const metadata: Metadata = { title: "Clients — Admin MTS" };
 export const dynamic = "force-dynamic";
 
 export default async function ClientsPage() {
@@ -19,7 +19,7 @@ export default async function ClientsPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-display font-semibold" style={{ color: "var(--ccb-green)" }}>
+        <h1 className="text-2xl font-display font-semibold" style={{ color: "var(--mts-primary)" }}>
           Clients <span className="text-lg text-gray-400 font-sans font-normal">({clients.length})</span>
         </h1>
       </div>

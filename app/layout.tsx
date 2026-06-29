@@ -3,12 +3,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    template: "%s | CCB Matériaux",
-    default: "CCB Matériaux — Matériaux de construction au Sénégal",
+    template: "%s | Mor Talla Sandaga",
+    default: "Mor Talla Sandaga — Chaussures femme au Sénégal",
   },
   description:
-    "Commandez vos matériaux de construction en ligne ou sur WhatsApp. Livraison rapide à Dakar et dans les régions.",
-  keywords: ["matériaux construction", "Sénégal", "Dakar", "ciment", "carrelage", "plomberie"],
+    "Commandez vos chaussures femme en ligne ou sur WhatsApp. Livraison rapide à Dakar et dans les régions.",
+  keywords: ["chaussures femme", "Sénégal", "Dakar", "escarpins", "sandales", "bottes"],
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",

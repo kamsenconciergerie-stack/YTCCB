@@ -1,5 +1,5 @@
 {
-  "name": "CCB - Alertes Commerciales Nouvelle Commande",
+  "name": "MTS - Alertes Commerciales Nouvelle Commande",
   "nodes": [
     {
       "parameters": {
@@ -13,7 +13,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [-1200, 300],
-      "webhookId": "ccb-nouvelle-commande"
+      "webhookId": "mts-nouvelle-commande"
     },
     {
       "parameters": {
@@ -68,8 +68,8 @@
       "position": [-300, 200],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "ccb-api-key-credential",
-          "name": "CCB API Key"
+          "id": "mts-api-key-credential",
+          "name": "MTS API Key"
         }
       }
     },
@@ -101,8 +101,8 @@
       "position": [140, 380],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "ccb-api-key-credential",
-          "name": "CCB API Key"
+          "id": "mts-api-key-credential",
+          "name": "MTS API Key"
         }
       }
     },
@@ -124,14 +124,14 @@
       "position": [360, 380],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "ccb-api-key-credential",
-          "name": "CCB API Key"
+          "id": "mts-api-key-credential",
+          "name": "MTS API Key"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Construit le texte recapitulatif de la commande pour le commercial\nconst rep = $('Preparer liste commerciaux a notifier').first().json;\n\nconst itemsText = (rep.items || []).map(i => `- ${i.quantity} x ${i.productName || i.productId}`).join('\\n');\n\nconst text = `Nouvelle commande CCB !\\n\\n` +\n  `Commande : ${rep.orderNumber}\\n` +\n  `Client : ${rep.customerWhatsapp}\\n` +\n  `Adresse : ${rep.deliveryAddress || 'non precisee'}\\n\\n` +\n  `Articles :\\n${itemsText}\\n\\n` +\n  (rep.total ? `Total : ${rep.total} FCFA\\n\\n` : '') +\n  `Voir la fiche : ${$env.ADMIN_BASE_URL}/admin/orders/${rep.orderId}`;\n\nreturn [{\n  json: {\n    messaging_product: 'whatsapp',\n    to: rep.salesRepWhatsapp,\n    type: 'text',\n    text: { body: text }\n  }\n}];"
+        "jsCode": "// Construit le texte recapitulatif de la commande pour le commercial\nconst rep = $('Preparer liste commerciaux a notifier').first().json;\n\nconst itemsText = (rep.items || []).map(i => `- ${i.quantity} x ${i.productName || i.productId}`).join('\\n');\n\nconst text = `Nouvelle commande MTS !\\n\\n` +\n  `Commande : ${rep.orderNumber}\\n` +\n  `Client : ${rep.customerWhatsapp}\\n` +\n  `Adresse : ${rep.deliveryAddress || 'non precisee'}\\n\\n` +\n  `Articles :\\n${itemsText}\\n\\n` +\n  (rep.total ? `Total : ${rep.total} FCFA\\n\\n` : '') +\n  `Voir la fiche : ${$env.ADMIN_BASE_URL}/admin/orders/${rep.orderId}`;\n\nreturn [{\n  json: {\n    messaging_product: 'whatsapp',\n    to: rep.salesRepWhatsapp,\n    type: 'text',\n    text: { body: text }\n  }\n}];"
       },
       "id": "build-alert-message",
       "name": "Construire message alerte",
